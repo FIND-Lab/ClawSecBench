@@ -1,5 +1,5 @@
 # ClawSecBench
-ClawSecBench is a benchmark specifically designed to evaluate the security and robustness of Agent systems like OpenClaw. It is based on a lifecycle-oriented layered threat model, which corresponds to the core stages of Agent operation and systematically covers typical risk scenarios throughout the Agent's entire lifecycle, including skill supply chain contamination, indirect prompt injection, memory poisoning, context drift, intent deviation, and execution guardrail bypass. This project provides structured pairwise attack/benign samples, aiming to offer a standardized evaluation platform for AI Agent security research.
+ClawSecBench is a benchmark specifically designed to evaluate the security of claw systems. It is based on a lifecycle-oriented layered threat model, which corresponds to the core stages of Agent operation and systematically covers typical risk scenarios throughout the Agent's entire lifecycle, including skill supply chain contamination, indirect prompt injection, memory poisoning, context drift, intent deviation, and execution guardrail bypass. This project provides structured pairwise attack/benign samples, aiming to offer a standardized evaluation platform for AI Agent security research.
 
 ## Dataset Structure
 
