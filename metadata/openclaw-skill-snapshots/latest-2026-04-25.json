@@ -1,0 +1,216 @@
+{
+  "image": "ghcr.io/openclaw/openclaw:latest",
+  "image_id": "sha256:070ef3bab46dca82ac20818c68f2814185e1009118076a767d79b8d2b9eadadb",
+  "captured_at": "2026-04-25T00:00:00+08:00",
+  "capture_method": "openclaw skills list --json",
+  "skills": [
+    {
+      "name": "1password",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "apple-notes",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "apple-reminders",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "bear-notes",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "blogwatcher",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "blucli",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "bluebubbles",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "camsnap",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "clawhub",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "coding-agent",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "discord",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "eightctl",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "gemini",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "gh-issues",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "gifgrep",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "github",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "gog",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "goplaces",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "healthcheck",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "himalaya",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "imsg",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "mcporter",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "model-usage",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "nano-pdf",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "node-connect",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "notion",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "obsidian",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "openai-whisper",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "openai-whisper-api",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "openhue",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "oracle",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "ordercli",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "peekaboo",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "sag",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "session-logs",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "sherpa-onnx-tts",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "skill-creator",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "slack",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "songsee",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "sonoscli",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "spotify-player",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "summarize",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "taskflow",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "taskflow-inbox-triage",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "things-mac",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "tmux",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "trello",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "video-frames",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "voice-call",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "wacli",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "weather",
+      "source": "openclaw-bundled"
+    },
+    {
+      "name": "xurl",
+      "source": "openclaw-bundled"
+    }
+  ]
+}
