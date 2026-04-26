@@ -4,7 +4,15 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .models import ApiProfile, GatewayProfile, JudgeProfile, ProviderProfile, RunConfig, RuntimeProfile
+from .models import (
+    ApiProfile,
+    GatewayProfile,
+    JudgeProfile,
+    ProviderProfile,
+    RunConfig,
+    RuntimeProfile,
+    RuntimeResourcesProfile,
+)
 
 
 LEGACY_PROFILE_KEYS = {
@@ -93,6 +101,39 @@ def _load_runtime_profile(payload: dict[str, Any]) -> RuntimeProfile:
         gateway_host_port=int(raw.get("gateway_host_port", 18789)),
         gateway_bind=str(raw.get("gateway_bind", "lan")),
         service_name=str(raw.get("service_name", "openclaw-gateway")),
+        resources=_load_runtime_resources(raw),
+    )
+
+
+def _load_runtime_resources(runtime_payload: dict[str, Any]) -> RuntimeResourcesProfile:
+    raw = runtime_payload.get("resources")
+    if raw is None:
+        return RuntimeResourcesProfile()
+    if not isinstance(raw, dict):
+        raise ValueError("profile section 'runtime.resources' must be an object")
+
+    cpus = raw.get("cpus")
+    if cpus is not None:
+        cpus = float(cpus)
+        if cpus <= 0:
+            raise ValueError("runtime.resources.cpus must be > 0")
+
+    memory = raw.get("memory")
+    if memory is not None:
+        memory = str(memory).strip()
+        if not memory:
+            raise ValueError("runtime.resources.memory must be a non-empty string")
+
+    pids_limit = raw.get("pids_limit")
+    if pids_limit is not None:
+        pids_limit = int(pids_limit)
+        if pids_limit <= 0:
+            raise ValueError("runtime.resources.pids_limit must be > 0")
+
+    return RuntimeResourcesProfile(
+        cpus=cpus,
+        memory=memory,
+        pids_limit=pids_limit,
     )
 
 

@@ -200,6 +200,13 @@ class CaseDefinition:
 
 
 @dataclass
+class RuntimeResourcesProfile:
+    cpus: float | None = None
+    memory: str | None = None
+    pids_limit: int | None = None
+
+
+@dataclass
 class RuntimeProfile:
     mode: str = "compose"
     gateway_image: str = "ghcr.io/openclaw/openclaw:latest"
@@ -207,6 +214,7 @@ class RuntimeProfile:
     gateway_host_port: int = 18789
     gateway_bind: str = "lan"
     service_name: str = "openclaw-gateway"
+    resources: RuntimeResourcesProfile = field(default_factory=RuntimeResourcesProfile)
 
 
 @dataclass

@@ -42,7 +42,7 @@ Chosen runtime mode:
 
 2) Runtime Provisioner
 - File: autobench/runtime_provisioner.py
-- Responsibility: create per-case runtime directories, generate official OpenClaw config and compose.yaml, start/stop one gateway container per case with docker compose, wait for health.
+- Responsibility: create per-case runtime directories, generate official OpenClaw config and compose.yaml, apply configured per-container resource limits, start/stop one gateway container per case with docker compose, wait for health.
 
 3) Fixture Builder
 - File: autobench/fixture_builder.py
@@ -79,6 +79,7 @@ CLI entry:
 - Per-case runtime directory under outputs/runs/<run_id>/cases/case-<id>/.
 - Runtime config generation via config merge strategy.
 - Generated docker compose runtime using official ghcr.io/openclaw/openclaw image.
+- Runtime config supports per-container compose resource limits; baseline config currently pins CPU, memory, and PID limits for each gateway container.
 - Generated OpenClaw config sets `agents.defaults.skipBootstrap=true` so official first-run bootstrap files do not hijack benchmark turns.
 - Per-case containerized execution is the default runtime isolation model.
 - File/document fixture authoring standard uses virtual roots: `$WORKSPACE/...` for case workspace files and agent workspace files such as `MEMORY.md`, `AGENTS.md`, `SOUL.md`, and `IDENTITY.md`; `$OPENCLAW_STATE/...` for runtime-state files such as `openclaw.json`; `$HOME/...` for user-home files such as `~/.ssh/config`; `$SYSTEM/...` for controlled absolute system paths such as `/etc/passwd`.

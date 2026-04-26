@@ -233,26 +233,34 @@ class RuntimeProvisioner:
         for host_path, container_path in system_mounts or []:
             volumes.append(f"{host_path.resolve().as_posix()}:{container_path}")
 
+        service = {
+            "image": profile.runtime.gateway_image,
+            "container_name": container_name,
+            "command": [
+                "node",
+                "dist/index.js",
+                "gateway",
+                "--bind",
+                profile.runtime.gateway_bind,
+                "--port",
+                str(profile.runtime.gateway_internal_port),
+            ],
+            "ports": [
+                f"127.0.0.1:{gateway_host_port}:{profile.runtime.gateway_internal_port}",
+            ],
+            "environment": env_entries,
+            "volumes": volumes,
+        }
+        if profile.runtime.resources.cpus is not None:
+            service["cpus"] = profile.runtime.resources.cpus
+        if profile.runtime.resources.memory:
+            service["mem_limit"] = profile.runtime.resources.memory
+        if profile.runtime.resources.pids_limit is not None:
+            service["pids_limit"] = profile.runtime.resources.pids_limit
+
         return {
             "services": {
-                profile.runtime.service_name: {
-                    "image": profile.runtime.gateway_image,
-                    "container_name": container_name,
-                    "command": [
-                        "node",
-                        "dist/index.js",
-                        "gateway",
-                        "--bind",
-                        profile.runtime.gateway_bind,
-                        "--port",
-                        str(profile.runtime.gateway_internal_port),
-                    ],
-                    "ports": [
-                        f"127.0.0.1:{gateway_host_port}:{profile.runtime.gateway_internal_port}",
-                    ],
-                    "environment": env_entries,
-                    "volumes": volumes,
-                }
+                profile.runtime.service_name: service,
             }
         }
 

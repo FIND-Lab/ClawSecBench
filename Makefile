@@ -26,7 +26,7 @@ OUTPUT_ROOT ?= outputs
 RUN_ID ?=
 # 只运行/检查指定 case，支持空格或逗号分隔
 CASE_IDS ?=
-# 预留并发参数；当前 runtime 仍按串行执行
+# benchmark case 级并发数
 CONCURRENCY ?= 1
 # 可选的 unittest 模块/用例选择器
 TEST ?=
@@ -55,7 +55,7 @@ REWRITE_CONCURRENCY ?= 50
 OVERWRITE ?=
 # 真值时额外导出 rewrite prompt
 DUMP_PROMPTS ?=
-# 真值时保留每个 case 的 runtime 目录
+# debug-only：真值时保留最后一个 supported case 的 runtime 目录；要求 CONCURRENCY=1
 KEEP_RUNTIME ?=
 # 真值时禁用 success_mode=judge 的主成功判定
 DISABLE_PRIMARY_SUCCESS_JUDGE ?=

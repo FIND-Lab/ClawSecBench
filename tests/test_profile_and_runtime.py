@@ -18,7 +18,14 @@ class ProfileAndRuntimeTest(unittest.TestCase):
                 json.dumps(
                     {
                         "name": "test",
-                        "runtime": {"gateway_image": "ghcr.io/openclaw/openclaw:latest"},
+                        "runtime": {
+                            "gateway_image": "ghcr.io/openclaw/openclaw:latest",
+                            "resources": {
+                                "cpus": 1.5,
+                                "memory": "3g",
+                                "pids_limit": 256,
+                            },
+                        },
                         "gateway": {"agent_target": "openclaw/default"},
                         "provider": {
                             "base_url": "https://api.openai.com/v1",
@@ -42,6 +49,9 @@ class ProfileAndRuntimeTest(unittest.TestCase):
             self.assertEqual(profile.provider.model, "openai/test-model")
         self.assertEqual(profile.provider.api_key_env, "TEST_API_KEY")
         self.assertEqual(profile.runtime.gateway_host_port, 19999)
+        self.assertEqual(profile.runtime.resources.cpus, 1.5)
+        self.assertEqual(profile.runtime.resources.memory, "3g")
+        self.assertEqual(profile.runtime.resources.pids_limit, 256)
         self.assertEqual(profile.gateway.request_timeout_sec, 300)
         self.assertEqual(profile.gateway.agent_target, "openclaw/default")
 
@@ -84,6 +94,26 @@ class ProfileAndRuntimeTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "judge.enabled is no longer supported"):
                 load_api_profile(profile_path)
 
+    def test_rejects_invalid_runtime_resources_section(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            profile_path = Path(tmp) / "profile.json"
+            profile_path.write_text(
+                json.dumps(
+                    {
+                        "name": "test",
+                        "runtime": {
+                            "resources": {
+                                "cpus": 0,
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "runtime.resources.cpus must be > 0"):
+                load_api_profile(profile_path)
+
     def test_renders_official_gateway_config_and_compose(self) -> None:
         profile = load_api_profile(Path("configs/baseline.json"))
         provisioner = RuntimeProvisioner()
@@ -116,6 +146,9 @@ class ProfileAndRuntimeTest(unittest.TestCase):
         self.assertIn("127.0.0.1:18789:18789", service["ports"])
         self.assertIn("DASHSCOPE_API_KEY", service["environment"])
         self.assertIn("OPENCLAW_GATEWAY_TOKEN", service["environment"])
+        self.assertEqual(service["cpus"], 2.0)
+        self.assertEqual(service["mem_limit"], "4g")
+        self.assertEqual(service["pids_limit"], 512)
         self.assertTrue(any(volume.endswith(":/home/node") for volume in service["volumes"]))
 
     def test_prepares_exact_system_file_mounts_for_system_targets(self) -> None:
