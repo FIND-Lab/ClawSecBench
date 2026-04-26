@@ -236,6 +236,10 @@ class RuntimeProvisioner:
         service = {
             "image": profile.runtime.gateway_image,
             "container_name": container_name,
+            # Each benchmark case runs a single gateway container accessed through
+            # a published localhost port, so a per-project compose network adds no
+            # value and can exhaust Docker's default subnet pool during full runs.
+            "network_mode": "bridge",
             "command": [
                 "node",
                 "dist/index.js",

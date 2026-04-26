@@ -143,6 +143,7 @@ class ProfileAndRuntimeTest(unittest.TestCase):
         self.assertEqual(openclaw_config["models"]["providers"]["dashscope"]["models"][0]["id"], "qwen3.6-plus")
         service = compose["services"]["openclaw-gateway"]
         self.assertEqual(service["image"], "ghcr.io/openclaw/openclaw:latest")
+        self.assertEqual(service["network_mode"], "bridge")
         self.assertIn("127.0.0.1:18789:18789", service["ports"])
         self.assertIn("DASHSCOPE_API_KEY", service["environment"])
         self.assertIn("OPENCLAW_GATEWAY_TOKEN", service["environment"])
@@ -280,6 +281,7 @@ class ProfileAndRuntimeTest(unittest.TestCase):
         )
 
         self.assertEqual(list(compose["services"]), ["openclaw-gateway"])
+        self.assertEqual(compose["services"]["openclaw-gateway"]["network_mode"], "bridge")
 
 
 if __name__ == "__main__":

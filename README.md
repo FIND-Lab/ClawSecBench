@@ -88,6 +88,7 @@ docker compose version
 - `make dry` / `make check` / `make rewrite` 不依赖 Docker。
 - `make run` 与直接执行 benchmark CLI 时，需要本机 Docker daemon 正常运行，且 `docker compose` 命令可用。
 - 首次执行 benchmark 时会自动拉取 `openclaw` 镜像，耗时取决于网络与镜像缓存情况。
+- 运行时 gateway 容器复用 Docker 默认 `bridge` 网络，不会为每个 case 额外创建一张 compose project 网络；这能避免全量跑时耗尽 Docker 默认 IPv4 地址池。
 - `configs/baseline.json` 现在默认给每个 OpenClaw gateway 容器加了资源限制：`2.0` CPU、`4g` 内存、`512` PID；如果宿主机资源或 case 负载不同，可以调整 `runtime.resources`。
 - 如果你不使用 Makefile 默认的 `./.venv/bin/python`，可以在执行时覆盖，例如 `make test PYTHON=python3`，或直接调用 CLI。
 

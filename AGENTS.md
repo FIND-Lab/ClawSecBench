@@ -79,6 +79,7 @@ CLI entry:
 - Per-case runtime directory under outputs/runs/<run_id>/cases/case-<id>/.
 - Runtime config generation via config merge strategy.
 - Generated docker compose runtime using official ghcr.io/openclaw/openclaw image.
+- Compose runtime uses Docker's shared `bridge` network instead of per-case project networks, avoiding default IPv4 subnet pool exhaustion during large runs.
 - Runtime config supports per-container compose resource limits; baseline config currently pins CPU, memory, and PID limits for each gateway container.
 - Generated OpenClaw config sets `agents.defaults.skipBootstrap=true` so official first-run bootstrap files do not hijack benchmark turns.
 - Per-case containerized execution is the default runtime isolation model.
