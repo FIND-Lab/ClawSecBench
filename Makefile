@@ -108,7 +108,7 @@ EFFECTIVE_JUDGE_MODEL = $(strip $(or $(JUDGE_MODEL),$(MODEL)))
 EFFECTIVE_JUDGE_BASE_URL = $(strip $(or $(JUDGE_BASE_URL),$(BASE_URL)))
 EFFECTIVE_JUDGE_API_KEY_ENV = $(strip $(or $(JUDGE_API_KEY_ENV),$(API_KEY_ENV)))
 
-.PHONY: help test rewrite dry check run report clean-run
+.PHONY: help test rewrite dry check run report clean-run stop-docker
 
 help: ## Show available targets and key variables
 	@awk 'BEGIN {FS = ":.*## "; printf "\nTargets:\n"} /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -128,6 +128,7 @@ help: ## Show available targets and key variables
 	@printf "  make dry CASE_IDS=41\n"
 	@printf "  make run CASE_IDS='29 30 70' BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1 API_KEY_ENV=DASHSCOPE_API_KEY PROVIDER_MODEL=dashscope/qwen3.6-plus JUDGE_MODEL=qwen3.6-plus\n"
 	@printf "  make report RUN_ID=run-web-public-20260425-1\n\n"
+	@printf "  make stop-docker\n\n"
 
 test: ## Run unit tests; optional TEST=tests.test_cli_dry_run
 	@if [ -n "$(TEST)" ]; then \
@@ -197,3 +198,19 @@ report: ## Rebuild summary.json and report.md from an existing run
 clean-run: ## Remove one run directory; requires RUN_ID
 	@test -n "$(RUN_ID)" || { echo "RUN_ID is required, e.g. make clean-run RUN_ID=run-20260425-000001"; exit 1; }
 	@rm -rf "$(OUTPUT_ROOT)/runs/$(RUN_ID)"
+
+stop-docker: ## Stop/remove benchmark-created containers and legacy networks
+	@containers="$$(docker ps -aq --filter 'name=autobench-gateway-')"; \
+	if [ -n "$$containers" ]; then \
+		echo "Removing benchmark containers: $$containers"; \
+		docker rm -f $$containers; \
+	else \
+		echo "No benchmark containers found."; \
+	fi
+	@networks="$$(docker network ls -q --filter 'name=autobench-')"; \
+	if [ -n "$$networks" ]; then \
+		echo "Removing legacy benchmark networks: $$networks"; \
+		docker network rm $$networks; \
+	else \
+		echo "No legacy benchmark networks found."; \
+	fi

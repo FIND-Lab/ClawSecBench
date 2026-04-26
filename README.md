@@ -187,6 +187,7 @@ make report RUN_ID=run-web-public-20260425-1
 - `make run`
 - `make report`
 - `make clean-run RUN_ID=<run_id>`
+- `make stop-docker`
 
 常用变量：
 
@@ -207,6 +208,14 @@ make report RUN_ID=run-web-public-20260425-1
 - `QUIET=1`
 - `KEEP_RUNTIME=1`
   debug-only；仅保留最后一个 supported case 的 runtime，且只能与 `CONCURRENCY=1` 一起使用
+
+清理 benchmark 残留 Docker 资源：
+
+```bash
+make stop-docker
+```
+
+这个目标会强制移除本项目创建的 `autobench-gateway-*` 容器，并额外清理旧版本运行可能遗留的 `autobench-*` Docker 网络；不会删除镜像，也不会碰非 benchmark 命名空间的容器。
 
 ## 直接用 CLI
 

@@ -133,6 +133,7 @@ Gap E: runtime CLI behavior
 3. Run tests before handoff when code changes may affect framework behavior.
 4. Execute CLI:
    `PYTHONPATH=. ./.venv/bin/python -m autobench.cli --config configs/baseline.json --cases-dir cases-v2 --output-root outputs`
+5. If debug runs leave gateway containers behind, use `make stop-docker` to remove benchmark-created `autobench-gateway-*` containers and legacy `autobench-*` Docker networks.
 
 Optional filters:
 - --case-id 41 --case-id 47
