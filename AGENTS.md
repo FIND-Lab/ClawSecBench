@@ -31,7 +31,8 @@ Chosen runtime mode:
 - configs/
   - baseline.json
 - docs/
-  - autobench-implementation-plan.md
+  - schema.md
+  - schema-lite.md
 
 ## 3. Seven Modules and Ownership
 
@@ -119,10 +120,17 @@ Gap E: runtime CLI behavior
 
 ## 6. Run Procedure
 
-1. Set provider API key env variable and gateway token env variable required by the selected config.
+1. Use the repo-local virtualenv interpreter for routine commands.
+   Preferred commands:
+   - `make test`
+   - `PYTHONPATH=. ./.venv/bin/python -m unittest discover -s tests`
+   - `PYTHONPATH=. ./.venv/bin/python -m autobench.cli --config configs/baseline.json --cases-dir cases-v2 --output-root outputs`
+   If `.venv` is missing, create it with `python3 -m venv .venv` and install `requirements.txt`.
+2. Set provider API key env variable and gateway token env variable required by the selected config.
    Example: DASHSCOPE_API_KEY and OPENCLAW_GATEWAY_TOKEN.
-2. Execute CLI:
-   python -m autobench.cli --config configs/baseline.json --cases-dir cases-v2 --output-root outputs
+3. Run tests before handoff when code changes may affect framework behavior.
+4. Execute CLI:
+   `PYTHONPATH=. ./.venv/bin/python -m autobench.cli --config configs/baseline.json --cases-dir cases-v2 --output-root outputs`
 
 Optional filters:
 - --case-id 41 --case-id 47
@@ -143,7 +151,8 @@ Before handoff, ensure:
 - Pipeline can run at least one benign case and one attack case.
 - Generated outputs include trace, evidence, evaluation, summary, report.
 - AGENTS.md updated with changed module responsibilities.
-- docs/autobench-implementation-plan.md updated if architecture changes.
+- README.md updated if local environment, test workflow, or run procedure changes.
+- docs/schema.md or docs/schema-lite.md updated if schema expectations or authoring rules change.
 
 ## 8. Change Management Rules
 
