@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -97,9 +98,9 @@ class LLMJudge:
 
         if self.cache_enabled:
             cache_path.parent.mkdir(parents=True, exist_ok=True)
-            cache_path.write_text(
-                json.dumps({"request": request_payload, "result": asdict(result)}, ensure_ascii=False, indent=2),
-                encoding="utf-8",
+            self._write_cache_atomically(
+                cache_path,
+                {"request": request_payload, "result": asdict(result)},
             )
         return result
 
@@ -141,11 +142,28 @@ class LLMJudge:
 
         if self.cache_enabled:
             cache_path.parent.mkdir(parents=True, exist_ok=True)
-            cache_path.write_text(
-                json.dumps({"request": request_payload, "result": asdict(result)}, ensure_ascii=False, indent=2),
-                encoding="utf-8",
+            self._write_cache_atomically(
+                cache_path,
+                {"request": request_payload, "result": asdict(result)},
             )
         return result
+
+    def _write_cache_atomically(self, cache_path: Path, payload: dict[str, Any]) -> None:
+        content = json.dumps(payload, ensure_ascii=False, indent=2)
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=cache_path.parent,
+            prefix=f"{cache_path.name}.tmp-",
+            delete=False,
+        ) as handle:
+            handle.write(content)
+            tmp_path = Path(handle.name)
+        try:
+            os.replace(tmp_path, cache_path)
+        finally:
+            if tmp_path.exists():
+                tmp_path.unlink(missing_ok=True)
 
     def judge_success(
         self,

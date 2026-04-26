@@ -50,6 +50,8 @@ def main() -> None:
         parser.error("--report-only requires --run-id")
     if not args.report_only and not args.config:
         parser.error("--config is required unless --report-only is used")
+    if args.keep_runtime and args.concurrency > 1:
+        parser.error("--keep-runtime is debug-only and requires --concurrency 1")
 
     run_id = args.run_id or dt.datetime.now().strftime("run-%Y%m%d-%H%M%S")
     output_root = Path(args.output_root)

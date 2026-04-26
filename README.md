@@ -28,7 +28,7 @@
 - `reporter` 生成 `summary.json` 和 `report.md`
 - `--dry` 仅做 case 级检查，不启动 runtime
 - `--report-only` 从已有 evaluation 重新生成 summary/report
-- CLI / Makefile 暴露了 `--concurrency` / `CONCURRENCY`，但当前 pipeline 仍按串行执行；该参数目前只是预留位，不代表已支持并发 benchmark
+- `--concurrency` / `CONCURRENCY` 支持 case 级并行 benchmark 执行
 
 当前 schema 已声明但 runtime 还未实现的能力：
 
@@ -165,6 +165,8 @@ make run CASE_IDS='29 30 70' \
 make run CASE_IDS=41 KEEP_RUNTIME=1
 ```
 
+说明：`KEEP_RUNTIME=1` 是 debug-only 开关，只会保留最后一个 supported case 的 runtime 现场，且要求 `CONCURRENCY=1`。
+
 ### 5. 从已有 evaluation 重建报告
 
 ```bash
@@ -198,10 +200,11 @@ make report RUN_ID=run-web-public-20260425-1
 - `REWRITE_CONCURRENCY=50`
 - case 的 canonical `metadata.id` 是字符串，默认与文件名 stem 一致，例如 `0041`；CLI 仍接受 `41` 这种数字简写做筛选
 - `CONCURRENCY=1`
-  当前只是保留参数；即使传入大于 1，pipeline 也仍然串行执行
+  benchmark 执行的 case 级并发数；会占用从 `gateway_host_port` 开始的连续端口池
 - `RUN_ID=run-adhoc-001`
 - `QUIET=1`
 - `KEEP_RUNTIME=1`
+  debug-only；仅保留最后一个 supported case 的 runtime，且只能与 `CONCURRENCY=1` 一起使用
 
 ## 直接用 CLI
 

@@ -168,6 +168,8 @@ def build_run_config(
     dry_run: bool = False,
     disable_primary_success_judge: bool = False,
 ) -> RunConfig:
+    if keep_runtime and concurrency > 1:
+        raise ValueError("keep_runtime is debug-only and requires concurrency=1")
     profile = load_api_profile(
         profile_path,
         provider_base_url=provider_base_url,

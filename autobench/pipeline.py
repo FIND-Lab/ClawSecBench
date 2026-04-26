@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import os
+from queue import Queue
 import secrets
 import traceback
 from dataclasses import asdict
@@ -31,6 +33,8 @@ class AutoBenchPipeline:
         self.reporter = Reporter()
 
     def run(self, run_config: RunConfig) -> dict:
+        if run_config.keep_runtime and run_config.concurrency > 1:
+            raise ValueError("keep_runtime is debug-only and requires concurrency=1")
         self.logger.enabled = run_config.verbose
         self.provisioner.logger = self.logger
         self.driver.logger = self.logger
@@ -72,92 +76,132 @@ class AutoBenchPipeline:
             logger=self.logger,
         )
         self.evaluator.disable_primary_success_judge = run_config.disable_primary_success_judge
-        results: list[CaseRunResult] = []
-        supported_case_count = sum(1 for _, features in case_support if not features)
-        keep_runtime_index = supported_case_count if run_config.keep_runtime else None
-        supported_index = 0
+        results_by_index: list[CaseRunResult | None] = [None] * len(case_support)
+        supported_entries: list[tuple[int, int, CaseDefinition]] = []
 
         for index, (case, unsupported_features) in enumerate(case_support, start=1):
-            self.logger.info(
-                f"case {index}/{len(cases)} start: "
-                f"id={case.metadata.id} type={case.metadata.sample_type.value} "
-                f"layer={case.metadata.threat_layer}"
-            )
             if unsupported_features:
+                self.logger.info(
+                    f"case {index}/{len(cases)} start: "
+                    f"id={case.metadata.id} type={case.metadata.sample_type.value} "
+                    f"layer={case.metadata.threat_layer}"
+                )
                 result = self._build_unsupported_case_result(case, run_dir, unsupported_features)
-                results.append(result)
+                results_by_index[index - 1] = result
                 self.logger.info(
                     f"{case_label(case.metadata.id)} skipped: "
                     + ", ".join(feature.code for feature in unsupported_features)
                 )
                 continue
+            supported_entries.append((index - 1, index, case))
 
-            supported_index += 1
-            gateway_host_port = run_config.profile.gateway_host_port
-            if run_config.keep_runtime:
-                gateway_host_port += supported_index - 1
+        supported_case_count = len(supported_entries)
+        if supported_entries:
+            port_pool: Queue[int] = Queue()
+            for offset in range(run_config.concurrency):
+                port_pool.put(run_config.profile.gateway_host_port + offset)
 
-            runtime = None
-            stage = "provision"
+            with ThreadPoolExecutor(max_workers=run_config.concurrency) as executor:
+                future_to_index = {
+                    executor.submit(
+                        self._run_supported_case,
+                        run_config,
+                        run_dir,
+                        case,
+                        total_cases=len(cases),
+                        case_position=case_position,
+                        supported_position=supported_position,
+                        supported_case_count=supported_case_count,
+                        gateway_token=gateway_token,
+                        port_pool=port_pool,
+                    ): result_index
+                    for supported_position, (result_index, case_position, case) in enumerate(supported_entries, start=1)
+                }
+                for future in as_completed(future_to_index):
+                    results_by_index[future_to_index[future]] = future.result()
+
+        results = [result for result in results_by_index if result is not None]
+        return self._finalize_run(run_config, run_dir, results, sample_report_path)
+
+    def _run_supported_case(
+        self,
+        run_config: RunConfig,
+        run_dir,
+        case: CaseDefinition,
+        *,
+        total_cases: int,
+        case_position: int,
+        supported_position: int,
+        supported_case_count: int,
+        gateway_token: str | None,
+        port_pool: Queue[int],
+    ) -> CaseRunResult:
+        self.logger.info(
+            f"case {case_position}/{total_cases} start: "
+            f"id={case.metadata.id} type={case.metadata.sample_type.value} "
+            f"layer={case.metadata.threat_layer}"
+        )
+        keep_runtime = run_config.keep_runtime and supported_position == supported_case_count
+        gateway_host_port = port_pool.get()
+        runtime = None
+        stage = "provision"
+        try:
+            runtime = self.provisioner.provision(
+                run_config,
+                case=case,
+                case_id=case.metadata.id,
+                gateway_host_port=gateway_host_port,
+            )
+            stage = "fixture_build"
+            fixture_manifest = self.fixture_builder.build(case, runtime)
+            self.logger.info(
+                f"{case_label(case.metadata.id)}: fixtures ready "
+                f"files={len(fixture_manifest.get('snapshot_before', {}))}"
+            )
+            stage = "conversation"
+            trace = self.driver.run_case(
+                case,
+                runtime,
+                fixture_manifest,
+                agent_target=run_config.profile.gateway.agent_target,
+                backend_model=run_config.profile.model,
+                gateway_token=gateway_token,
+                request_timeout_sec=run_config.profile.gateway.request_timeout_sec,
+            )
+            stage = "evidence_collect"
+            evidence = self.collector.collect(case, runtime, fixture_manifest, trace)
+            stage = "evaluate"
+            evaluation = self.evaluator.evaluate(case, evidence, runtime.artifacts_dir)
+
+            evidence_path = runtime.artifacts_dir / case_artifact_name(case.metadata.id, "evidence")
+            evaluation_path = runtime.artifacts_dir / case_artifact_name(case.metadata.id, "evaluation")
+            self.logger.info(
+                f"{case_label(case.metadata.id)} done: outcome={evaluation.outcome} "
+                f"A={evaluation.A} B={evaluation.B} R={evaluation.R} "
+                f"commands={len(evidence.command_events)}"
+            )
+            return CaseRunResult(
+                case=case,
+                evaluation=evaluation,
+                evidence_path=evidence_path,
+                evaluation_path=evaluation_path,
+            )
+        except Exception as exc:
+            result = self._build_runtime_error_case_result(
+                case,
+                run_dir,
+                stage=stage,
+                exc=exc,
+                runtime=runtime,
+            )
+            self.logger.info(
+                f"{case_label(case.metadata.id)} failed: "
+                f"stage={stage} error={type(exc).__name__}: {exc}"
+            )
+            return result
+        finally:
             try:
-                runtime = self.provisioner.provision(
-                    run_config,
-                    case=case,
-                    case_id=case.metadata.id,
-                    gateway_host_port=gateway_host_port,
-                )
-                stage = "fixture_build"
-                fixture_manifest = self.fixture_builder.build(case, runtime)
-                self.logger.info(
-                    f"{case_label(case.metadata.id)}: fixtures ready "
-                    f"files={len(fixture_manifest.get('snapshot_before', {}))}"
-                )
-                stage = "conversation"
-                trace = self.driver.run_case(
-                    case,
-                    runtime,
-                    fixture_manifest,
-                    agent_target=run_config.profile.gateway.agent_target,
-                    backend_model=run_config.profile.model,
-                    gateway_token=gateway_token,
-                    request_timeout_sec=run_config.profile.gateway.request_timeout_sec,
-                )
-                stage = "evidence_collect"
-                evidence = self.collector.collect(case, runtime, fixture_manifest, trace)
-                stage = "evaluate"
-                evaluation = self.evaluator.evaluate(case, evidence, runtime.artifacts_dir)
-
-                evidence_path = runtime.artifacts_dir / case_artifact_name(case.metadata.id, "evidence")
-                evaluation_path = runtime.artifacts_dir / case_artifact_name(case.metadata.id, "evaluation")
-                results.append(
-                    CaseRunResult(
-                        case=case,
-                        evaluation=evaluation,
-                        evidence_path=evidence_path,
-                        evaluation_path=evaluation_path,
-                    )
-                )
-                self.logger.info(
-                    f"{case_label(case.metadata.id)} done: outcome={evaluation.outcome} "
-                    f"A={evaluation.A} B={evaluation.B} R={evaluation.R} "
-                    f"commands={len(evidence.command_events)}"
-                )
-            except Exception as exc:
-                result = self._build_runtime_error_case_result(
-                    case,
-                    run_dir,
-                    stage=stage,
-                    exc=exc,
-                    runtime=runtime,
-                )
-                results.append(result)
-                self.logger.info(
-                    f"{case_label(case.metadata.id)} failed: "
-                    f"stage={stage} error={type(exc).__name__}: {exc}"
-                )
-            finally:
                 if runtime is not None:
-                    keep_runtime = keep_runtime_index is not None and supported_index == keep_runtime_index
                     try:
                         self.provisioner.teardown(runtime, keep_runtime=keep_runtime)
                     except Exception as exc:
@@ -165,8 +209,9 @@ class AutoBenchPipeline:
                             f"{case_label(case.metadata.id)} teardown failed: "
                             f"{type(exc).__name__}: {exc}"
                         )
-
-        return self._finalize_run(run_config, run_dir, results, sample_report_path)
+            finally:
+                if not keep_runtime:
+                    port_pool.put(gateway_host_port)
 
     def _finalize_run(self, run_config: RunConfig, run_dir, results: list[CaseRunResult], sample_report_path) -> dict:
         summary = self.reporter.build_summary(run_config.run_id, results, run_dir)

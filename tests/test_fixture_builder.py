@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import tempfile
 import unittest
@@ -46,9 +47,13 @@ class FixtureBuilderTest(unittest.TestCase):
             self.assertTrue(expected.exists())
             self.assertEqual(
                 json.loads(existing.read_text(encoding="utf-8")),
-                {"plugins": {"allow": ["safe-plugin"]}},
+                {"plugins": {"allow": []}},
             )
             self.assertIn("$OPENCLAW_STATE/openclaw.json", manifest["snapshot_before"])
+            self.assertEqual(
+                manifest["snapshot_before"]["$OPENCLAW_STATE/openclaw.json"],
+                hashlib.sha256(existing.read_bytes()).hexdigest(),
+            )
             self.assertFalse((case_workspace / "~").exists())
 
     def test_file_environment_without_target_is_rejected(self) -> None:

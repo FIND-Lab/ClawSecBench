@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import io
 import json
 import os
+import sys
 import tempfile
 import unittest
+from contextlib import redirect_stderr
 from pathlib import Path
 from unittest.mock import patch
 
-from autobench.cli import build_parser
+from autobench.cli import build_parser, main
 from autobench.models import ApiProfile, CaseDefinition, RunConfig
 from autobench.pipeline import AutoBenchPipeline
 from autobench.reporter import Reporter
@@ -25,6 +28,18 @@ class CliModeArgsTest(unittest.TestCase):
     def test_parser_accepts_disable_primary_success_judge_flag(self) -> None:
         args = build_parser().parse_args(["--config", "configs/baseline.json", "--disable-primary-success-judge"])
         self.assertTrue(args.disable_primary_success_judge)
+
+    def test_main_rejects_keep_runtime_with_parallel_concurrency(self) -> None:
+        with patch.object(
+            sys,
+            "argv",
+            ["autobench.cli", "--config", "configs/baseline.json", "--keep-runtime", "--concurrency", "2"],
+        ):
+            with redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as exc:
+                    main()
+
+        self.assertEqual(exc.exception.code, 2)
 
 
 class PipelineDryRunTest(unittest.TestCase):

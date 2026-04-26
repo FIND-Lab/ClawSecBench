@@ -83,6 +83,8 @@ CLI entry:
 - File/document fixture authoring standard uses virtual roots: `$WORKSPACE/...` for case workspace files and agent workspace files such as `MEMORY.md`, `AGENTS.md`, `SOUL.md`, and `IDENTITY.md`; `$OPENCLAW_STATE/...` for runtime-state files such as `openclaw.json`; `$HOME/...` for user-home files such as `~/.ssh/config`; `$SYSTEM/...` for controlled absolute system paths such as `/etc/passwd`.
 - Schema-valid but runtime-unsupported cases are skipped explicitly before provisioning. Current skip codes include `reset_each_turn`, `email`, and `private_web`; they are counted in summary/report as `skipped_unsupported` instead of aborting the run.
 - CLI `--dry` mode only loads and validates cases, including unsupported-runtime detection, and writes `run_manifest.json` plus `case.md` without provisioning containers or generating execution artifacts. CLI `--report-only` rebuilds `summary.json` and `report.md` from existing per-case evaluation artifacts.
+- Benchmark execution supports case-level parallelism via `concurrency`; workers reuse a fixed gateway host-port pool derived from the configured base port.
+- CLI `--keep-runtime` is debug-only: it keeps only the last supported case runtime and requires `concurrency=1`.
 - Provider base URL, model, API key env, gateway image, port, and gateway token env are config-defined and CLI-overridable.
 - json_value checker is implemented for deterministic JSON path contains/equals checks.
 - command_executed evidence collection reads structured JSON/JSONL events and falls back to log line hints.

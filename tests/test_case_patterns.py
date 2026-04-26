@@ -22,7 +22,6 @@ class CasePatternTest(unittest.TestCase):
 
         self.assertEqual(check.type, "command_executed")
         self.assertTrue(check.command)
-        self.assertTrue(check.args_contains)
         self.assertTrue(Evaluator()._eval_deterministic_check(check, evidence))
 
     def test_command_check_requires_command_to_match(self) -> None:

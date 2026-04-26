@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -23,8 +24,8 @@ from autobench.pipeline import AutoBenchPipeline
 
 
 class PipelineUnsupportedCasesTest(unittest.TestCase):
-    def _runtime(self, root: Path, case_id: str) -> RuntimeHandle:
-        case_root = root / "runs" / "runtime-errors" / "cases" / case_dirname(case_id)
+    def _runtime(self, root: Path, case_id: str, *, run_id: str = "runtime-errors") -> RuntimeHandle:
+        case_root = root / "runs" / run_id / "cases" / case_dirname(case_id)
         runtime = RuntimeHandle(
             run_dir=case_root,
             runtime_dir=case_root / "runtime",
@@ -406,6 +407,139 @@ class PipelineUnsupportedCasesTest(unittest.TestCase):
             self.assertEqual(manifest["summary"]["failed_cases"], 1)
             self.assertEqual(run_case.call_count, 1)
             self.assertEqual(teardown.call_count, 2)
+
+    def test_parallel_supported_cases_reuse_fixed_port_pool_and_preserve_result_order(self) -> None:
+        def build_case(case_id: str) -> CaseDefinition:
+            return CaseDefinition.from_dict(
+                {
+                    "metadata": {
+                        "id": case_id,
+                        "sample_type": "benign",
+                        "threat_layer": "trusted_foundation",
+                        "attack_category": "configuration_tampering",
+                    },
+                    "procedure": {
+                        "session_mode": "single_session",
+                        "turns": [{"role": "user", "content": f"Handle case {case_id}"}],
+                        "environment": [],
+                    },
+                    "benign_task": {
+                        "goal": f"Handle case {case_id}.",
+                        "success_mode": "judge",
+                        "success_judge": {"rubric": f"Handle case {case_id}."},
+                        "success_policy": "all",
+                        "success_checks": [],
+                    },
+                }
+            )
+
+        cases = [build_case("9101"), build_case("9102"), build_case("9103")]
+        profile = ApiProfile(name="test")
+        profile.gateway.token_env = "AUTOBENCH_TEST_GATEWAY_TOKEN_PARALLEL"
+        profile.provider.api_key_env = "AUTOBENCH_TEST_PROVIDER_KEY_PARALLEL"
+        profile.runtime.gateway_host_port = 18789
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_root = Path(tmp)
+            pipeline = AutoBenchPipeline()
+            run_config = RunConfig(
+                run_id="parallel-supported",
+                cases_dir=Path("cases-v2"),
+                output_root=output_root,
+                profile=profile,
+                verbose=False,
+                concurrency=2,
+            )
+
+            port_assignments: dict[str, int] = {}
+            assignment_lock = threading.Lock()
+            first_two_barrier = threading.Barrier(2)
+
+            def provision_side_effect(run_config, *, case, case_id, gateway_host_port):
+                with assignment_lock:
+                    port_assignments[case_id] = gateway_host_port
+                if case_id in {"9101", "9102"}:
+                    first_two_barrier.wait(timeout=2)
+                return self._runtime(output_root, case_id, run_id="parallel-supported")
+
+            def build_side_effect(case, runtime):
+                return {
+                    "case_workspace": str(runtime.workspace_dir),
+                    "snapshot_before": {},
+                }
+
+            def run_case_side_effect(case, runtime, fixture_manifest, **kwargs):
+                return ConversationTrace(
+                    case_id=case.metadata.id,
+                    session_key=f"case-{case.metadata.id}",
+                    turns=[
+                        TurnRecord(
+                            role="user",
+                            prompt=case.procedure.turns[0].content,
+                            response_text=f"done-{case.metadata.id}",
+                        )
+                    ],
+                )
+
+            def collect_side_effect(case, runtime, fixture_manifest, trace):
+                evidence = EvidenceBundle(
+                    case_id=case.metadata.id,
+                    final_reply=f"done-{case.metadata.id}",
+                    full_reply_text=f"done-{case.metadata.id}",
+                    artifacts={"workspace": str(runtime.workspace_dir)},
+                    trace=trace,
+                )
+                evidence_path = runtime.artifacts_dir / case_artifact_name(case.metadata.id, "evidence")
+                evidence_path.write_text(json.dumps(dataclasses.asdict(evidence), ensure_ascii=False, indent=2), encoding="utf-8")
+                return evidence
+
+            def evaluate_side_effect(case, evidence, artifacts_dir):
+                result = EvaluationResult(
+                    case_id=case.metadata.id,
+                    sample_type=SampleType.BENIGN,
+                    A=None,
+                    B=True,
+                    R=None,
+                    outcome="benign_success",
+                    quality_flags=[],
+                    check_details=[],
+                )
+                evaluation_path = artifacts_dir / case_artifact_name(case.metadata.id, "evaluation")
+                evaluation_path.write_text(json.dumps(dataclasses.asdict(result), ensure_ascii=False, indent=2), encoding="utf-8")
+                return result
+
+            with patch("autobench.pipeline.load_cases", return_value=cases), patch.object(
+                pipeline.provisioner, "provision", side_effect=provision_side_effect
+            ), patch.object(
+                pipeline.provisioner, "teardown"
+            ) as teardown, patch.object(
+                pipeline.fixture_builder, "build", side_effect=build_side_effect
+            ), patch.object(
+                pipeline.driver, "run_case", side_effect=run_case_side_effect
+            ), patch.object(
+                pipeline.collector, "collect", side_effect=collect_side_effect
+            ), patch.object(
+                pipeline.evaluator, "evaluate", side_effect=evaluate_side_effect
+            ), patch("autobench.pipeline.LLMJudge.from_profile", return_value=None):
+                manifest = pipeline.run(run_config)
+
+            self.assertEqual({port_assignments["9101"], port_assignments["9102"]}, {18789, 18790})
+            self.assertIn(port_assignments["9103"], {18789, 18790})
+            self.assertEqual(teardown.call_count, 3)
+
+            result_names = [Path(path).name for path in manifest["summary"]["result_paths"]]
+            self.assertEqual(
+                result_names,
+                [
+                    case_artifact_name("9101", "evaluation"),
+                    case_artifact_name("9102", "evaluation"),
+                    case_artifact_name("9103", "evaluation"),
+                ],
+            )
+            summary = json.loads((output_root / "runs" / "parallel-supported" / "summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(summary["finished_cases"], 3)
+            self.assertEqual(summary["failed_cases"], 0)
+            self.assertEqual(summary["skipped_cases"], 0)
 
 
 if __name__ == "__main__":
