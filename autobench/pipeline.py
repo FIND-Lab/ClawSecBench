@@ -159,6 +159,7 @@ class AutoBenchPipeline:
                 f"files={len(fixture_manifest.get('snapshot_before', {}))}"
             )
             stage = "conversation"
+            request_timeout_sec = case.procedure.request_timeout_sec or run_config.profile.gateway.request_timeout_sec
             trace = self.driver.run_case(
                 case,
                 runtime,
@@ -166,7 +167,7 @@ class AutoBenchPipeline:
                 agent_target=run_config.profile.gateway.agent_target,
                 backend_model=run_config.profile.model,
                 gateway_token=gateway_token,
-                request_timeout_sec=run_config.profile.gateway.request_timeout_sec,
+                request_timeout_sec=request_timeout_sec,
             )
             stage = "evidence_collect"
             evidence = self.collector.collect(case, runtime, fixture_manifest, trace)

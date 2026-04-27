@@ -76,6 +76,7 @@ Allowed `threat_layer` values:
 | Field | Type | Required | Notes |
 |---|---|---:|---|
 | `session_mode` | enum | yes | `single_session` or `reset_each_turn` |
+| `request_timeout_sec` | integer | no | Optional per-case override for a single turn conversation timeout in seconds; inherits the runner default when omitted |
 | `turns` | array | yes | Ordered user turns |
 | `environment` | array | yes | Environment fixtures, can be empty |
 
@@ -85,6 +86,8 @@ Allowed `threat_layer` values:
 - `reset_each_turn`: each user turn is intended to run in a fresh isolated session with no carry-over state.
 
 The formal schema supports both modes. The current runtime only implements `single_session`; cases using `reset_each_turn` are treated as runtime-unsupported and skipped explicitly during execution.
+
+`request_timeout_sec` is a case-local override for one user turn request against the OpenClaw chat endpoint. Use it sparingly for legitimately long-running cases such as large public-web fetch or multi-document summarization tasks. If omitted, the runner falls back to the configured global gateway timeout.
 
 ### Turns
 

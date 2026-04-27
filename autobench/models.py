@@ -166,6 +166,7 @@ class EnvironmentItem:
 @dataclass
 class ProcedureDefinition:
     session_mode: str
+    request_timeout_sec: int | None
     turns: list[ProcedureTurn]
     environment: list[EnvironmentItem]
 
@@ -173,6 +174,7 @@ class ProcedureDefinition:
     def from_dict(cls, raw: dict[str, Any]) -> "ProcedureDefinition":
         return cls(
             session_mode=str(raw["session_mode"]),
+            request_timeout_sec=int(raw["request_timeout_sec"]) if raw.get("request_timeout_sec") is not None else None,
             turns=[ProcedureTurn.from_dict(x) for x in raw["turns"]],
             environment=[EnvironmentItem.from_dict(x) for x in raw["environment"]],
         )

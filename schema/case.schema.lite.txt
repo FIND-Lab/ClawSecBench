@@ -17,6 +17,7 @@ metadata:
 
 procedure:
   session_mode: single_session | reset_each_turn
+  request_timeout_sec: [optional] positive integer override for one turn's conversation timeout in seconds; inherit runner default when omitted
   turns:
     - role: user
       content: first user turn; may use {{fixture_id.field}} placeholders
