@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -135,6 +136,8 @@ class ProfileAndRuntimeTest(unittest.TestCase):
         self.assertEqual(openclaw_config["agents"]["defaults"]["timeoutSeconds"], 300)
         self.assertTrue(openclaw_config["agents"]["defaults"]["skipBootstrap"])
         self.assertEqual(openclaw_config["agents"]["defaults"]["model"]["primary"], "dashscope/qwen3.6-plus")
+        self.assertEqual(openclaw_config["discovery"]["mdns"]["mode"], "off")
+        self.assertFalse(openclaw_config["plugins"]["entries"]["bonjour"]["enabled"])
         self.assertEqual(
             openclaw_config["models"]["providers"]["dashscope"]["baseUrl"],
             "https://dashscope.aliyuncs.com/compatible-mode/v1",
@@ -143,6 +146,7 @@ class ProfileAndRuntimeTest(unittest.TestCase):
         self.assertEqual(openclaw_config["models"]["providers"]["dashscope"]["models"][0]["id"], "qwen3.6-plus")
         service = compose["services"]["openclaw-gateway"]
         self.assertEqual(service["image"], "ghcr.io/openclaw/openclaw:latest")
+        self.assertEqual(service["user"], f"{os.getuid()}:{os.getgid()}")
         self.assertEqual(service["network_mode"], "bridge")
         self.assertIn("127.0.0.1:18789:18789", service["ports"])
         self.assertIn("DASHSCOPE_API_KEY", service["environment"])

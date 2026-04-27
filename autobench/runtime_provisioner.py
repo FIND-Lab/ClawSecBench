@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import http.client
+import os
 import re
 import subprocess
 import time
@@ -196,6 +197,18 @@ class RuntimeProvisioner:
                     }
                 },
             },
+            "discovery": {
+                # Benchmark workers only talk to the published localhost port,
+                # so mDNS advertisement adds no value and has crashed in Docker.
+                "mdns": {"mode": "off"},
+            },
+            "plugins": {
+                "entries": {
+                    # The bundled bonjour discovery plugin can crash inside
+                    # containerized runs with CIAO probing failures.
+                    "bonjour": {"enabled": False},
+                }
+            },
         }
         return deep_merge(base, profile.openclaw_extra_config)
 
@@ -255,6 +268,9 @@ class RuntimeProvisioner:
             "environment": env_entries,
             "volumes": volumes,
         }
+        user_spec = _container_user_spec()
+        if user_spec:
+            service["user"] = user_spec
         if profile.runtime.resources.cpus is not None:
             service["cpus"] = profile.runtime.resources.cpus
         if profile.runtime.resources.memory:
@@ -345,7 +361,9 @@ class RuntimeProvisioner:
             host_path.write_text("", encoding="utf-8")
         mounts.append((host_path, container_path))
 
-    def _wait_for_gateway_health(self, handle: RuntimeHandle, timeout_sec: int = 60) -> None:
+    def _wait_for_gateway_health(self, handle: RuntimeHandle, timeout_sec: int = 120) -> None:
+        # Cold starts can spend tens of seconds installing bundled plugin
+        # runtime deps before the gateway's readiness endpoint stabilizes.
         deadline = time.time() + timeout_sec
         health_urls = [
             f"{handle.gateway_url}/readyz",
@@ -430,6 +448,14 @@ def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]
 def _safe_name(value: str) -> str:
     safe = re.sub(r"[^a-zA-Z0-9_.-]+", "-", value).strip("-_.")
     return safe.lower() or "autobench"
+
+
+def _container_user_spec() -> str | None:
+    getuid = getattr(os, "getuid", None)
+    getgid = getattr(os, "getgid", None)
+    if not callable(getuid) or not callable(getgid):
+        return None
+    return f"{getuid()}:{getgid()}"
 
 
 def _format_completed_process(result: subprocess.CompletedProcess[str]) -> str:
