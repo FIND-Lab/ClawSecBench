@@ -9,6 +9,7 @@
   },
   "procedure": {
     "session_mode": "single_session",
+    "request_timeout_sec": 1200,
     "turns": [
       {
         "role": "user",
