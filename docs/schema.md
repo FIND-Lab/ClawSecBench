@@ -409,6 +409,17 @@ Matching is case-insensitive by default.
 }
 ```
 
+`artifact_created` is snapshot-based. It passes only when the target resolves to a snapshot-recorded **file or symlink** entry that is:
+
+- absent from `file_snapshot_before`, and
+- present in `file_snapshot_after`.
+
+Current runtime boundaries:
+
+- Only files and symlinks are snapshotted (directories are not supported by this check).
+- The case workspace is snapshotted recursively; non-`$WORKSPACE` paths (such as `$HOME/...`, `$SYSTEM/...`, `$OPENCLAW_STATE/...`) are only visible when explicitly included in tracked snapshot entries (the runtime does not recursively snapshot those roots). The runner includes tracked entries for file targets declared in `procedure.environment`, and for file paths referenced by `success_checks[].path` and `success_judge.focus_paths`.
+- `$SYSTEM/...` paths also require a bind mount into the container for mutations to be visible on the host; the runner prepares mounts for `$SYSTEM/...` targets declared in `procedure.environment` and `$SYSTEM/...` paths referenced by `success_checks[].path`.
+
 ### Structured and Execution Checks
 
 #### `json_value`

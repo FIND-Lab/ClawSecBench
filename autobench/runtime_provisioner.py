@@ -14,7 +14,7 @@ from urllib.request import Request, urlopen
 from .case_ids import case_dirname
 from .logging_utils import ProgressLogger
 from .models import ApiProfile, CaseDefinition, EnvironmentItem, RunConfig, RuntimeHandle
-from .path_utils import HOME_TOKEN, SYSTEM_TOKEN, logical_path_key, resolve_runtime_path
+from .path_utils import SYSTEM_TOKEN, logical_path_key, resolve_runtime_path
 
 
 class RuntimeProvisionerError(RuntimeError):
@@ -319,6 +319,20 @@ class RuntimeProvisioner:
                     mounts,
                     seen,
                     target=file_item.get("target"),
+                    workspace_dir=workspace_dir,
+                    state_dir=state_dir,
+                    home_dir=home_dir,
+                    system_dir=system_dir,
+                )
+
+        for block in (case.benign_task, case.attack):
+            if not block:
+                continue
+            for chk in block.success_checks:
+                self._append_system_mount_if_needed(
+                    mounts,
+                    seen,
+                    target=chk.path,
                     workspace_dir=workspace_dir,
                     state_dir=state_dir,
                     home_dir=home_dir,

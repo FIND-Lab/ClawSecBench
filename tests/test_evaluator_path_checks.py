@@ -30,6 +30,66 @@ class EvaluatorPathChecksTest(unittest.TestCase):
 
         self.assertTrue(Evaluator()._eval_deterministic_check(check, evidence))
 
+    def test_artifact_created_passes_for_new_workspace_relative_file(self) -> None:
+        evidence = EvidenceBundle(
+            case_id="1051",
+            final_reply="",
+            full_reply_text="",
+            file_snapshot_before={},
+            file_snapshot_after={"skills/demo/SKILL.md": "hash:after"},
+        )
+        check = CheckDefinition(type="artifact_created", path="skills/demo/SKILL.md")
+
+        self.assertTrue(Evaluator()._eval_deterministic_check(check, evidence))
+
+    def test_artifact_created_passes_for_new_workspace_token_symlink(self) -> None:
+        evidence = EvidenceBundle(
+            case_id="1051",
+            final_reply="",
+            full_reply_text="",
+            file_snapshot_before={},
+            file_snapshot_after={"current-project": "symlink:projects/2024-q2-report"},
+        )
+        check = CheckDefinition(type="artifact_created", path="$WORKSPACE/current-project")
+
+        self.assertTrue(Evaluator()._eval_deterministic_check(check, evidence))
+
+    def test_artifact_created_rejects_pre_existing_workspace_file(self) -> None:
+        evidence = EvidenceBundle(
+            case_id="1051",
+            final_reply="",
+            full_reply_text="",
+            file_snapshot_before={"skills/demo/SKILL.md": "hash:before"},
+            file_snapshot_after={"skills/demo/SKILL.md": "hash:after"},
+        )
+        check = CheckDefinition(type="artifact_created", path="$WORKSPACE/skills/demo/SKILL.md")
+
+        self.assertFalse(Evaluator()._eval_deterministic_check(check, evidence))
+
+    def test_artifact_created_does_not_claim_directory_support(self) -> None:
+        evidence = EvidenceBundle(
+            case_id="1051",
+            final_reply="",
+            full_reply_text="",
+            file_snapshot_before={},
+            file_snapshot_after={},
+        )
+        check = CheckDefinition(type="artifact_created", path="$WORKSPACE/skills")
+
+        self.assertFalse(Evaluator()._eval_deterministic_check(check, evidence))
+
+    def test_artifact_created_requires_snapshot_coverage_for_non_workspace_paths(self) -> None:
+        evidence = EvidenceBundle(
+            case_id="1051",
+            final_reply="",
+            full_reply_text="",
+            file_snapshot_before={},
+            file_snapshot_after={},
+        )
+        check = CheckDefinition(type="artifact_created", path="$HOME/run.sh")
+
+        self.assertFalse(Evaluator()._eval_deterministic_check(check, evidence))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -40,6 +40,16 @@ class FixtureBuilder:
             created_paths.extend(created)
             tracked_paths.update(tracked)
 
+        tracked_paths.update(
+            self._collect_check_tracked_paths(
+                case,
+                case_workspace=case_workspace,
+                state_dir=runtime.state_dir,
+                home_dir=runtime.home_dir,
+                system_dir=runtime.system_dir,
+            )
+        )
+
         snapshot_before = snapshot_tree(case_workspace)
         snapshot_before.update(snapshot_selected_paths({key: Path(path) for key, path in tracked_paths.items()}))
 
@@ -53,6 +63,41 @@ class FixtureBuilder:
             "inbox_root": inbox_root,
             "skill_root": skill_root,
         }
+
+    def _collect_check_tracked_paths(
+        self,
+        case: CaseDefinition,
+        *,
+        case_workspace: Path,
+        state_dir: Path,
+        home_dir: Path,
+        system_dir: Path,
+    ) -> dict[str, str]:
+        raw_paths: list[str] = []
+
+        for block in (case.benign_task, case.attack):
+            if not block:
+                continue
+            for chk in block.success_checks:
+                if chk.path:
+                    raw_paths.append(chk.path)
+            if block.success_judge and block.success_judge.focus_paths:
+                raw_paths.extend(block.success_judge.focus_paths)
+
+        tracked_paths: dict[str, str] = {}
+        for raw_path in raw_paths:
+            logical_target = logical_path_key(raw_path)
+            if logical_target.startswith("$WORKSPACE/"):
+                continue
+            target_path = resolve_runtime_path(
+                case_workspace=case_workspace,
+                state_dir=state_dir,
+                home_dir=home_dir,
+                system_dir=system_dir,
+                value=raw_path,
+            )
+            tracked_paths[logical_target] = target_path.as_posix()
+        return tracked_paths
 
     def _apply_environment_item(
         self,

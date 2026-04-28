@@ -4,14 +4,12 @@
 
 ## P0
 
-### 1. `artifact_created` 语义实现错误
+### 1. `artifact_created` 语义实现错误（已修复，2026-04-28）
 
-- 问题：
-  当前实现只检查目标是否出现在 `file_snapshot_after` 中，没有与 `file_snapshot_before` 做差异比较。
-- 影响：
-  只要目标文件在执行前就已经存在，也可能被误判为 “created”，会直接影响 `artifact_created` 判定可信度。
-- 当前现状：
-  这不是文档表述问题，而是实现语义本身不正确；而且现有样例已经在使用这个 check。
+- 修复内容：
+  `artifact_created` 现在基于快照差异判断：只有当目标在 `file_snapshot_before` 中不存在、且在 `file_snapshot_after` 中存在时才通过。
+- 现状：
+  已有回归测试覆盖该语义；仍仅支持 **文件 / symlink**（目录不在快照范围内）。
 
 ### 2. 同一 `run_id` 会复用旧目录，污染后续结果
 
@@ -54,17 +52,18 @@
 ### 4. `path_exists` / `artifact_created` 的语义范围与实际能力不一致
 
 - 问题：
-  当前快照只记录文件和 symlink，不记录目录；但这两个 check 的命名和文档表述仍容易让人理解成泛化的 path 级判断。
+  当前快照只记录文件和 symlink，不记录目录；这两个 check 的命名容易让人理解成泛化的 path 级判断。
 - 影响：
   如果 case 编写者拿目录去写 `path_exists` 或 `artifact_created`，schema 可能通过，但运行时并不能按预期评估。
 - 当前现状：
-  这更像语义边界没有收紧，不是主链路 bug，但发布前最好明确“目前只支持文件 / symlink”还是补目录快照。
+  已在文档中明确“目前只支持文件 / symlink”，并且 runner 会自动把 `success_checks[].path` 与 `success_judge.focus_paths` 引用到的非 `$WORKSPACE` 路径加入 tracked snapshots（避免 `$HOME/...` 之类路径在快照中不可见）。
+  目录级快照能力仍未补齐。
 
 ## 当前建议
 
 建议先按下面顺序处理：
 
-1. 先修正 `artifact_created` 的真实语义，再处理同一 `run_id` 目录复用问题，这两项会直接影响结果正确性。
+1. 先处理同一 `run_id` 目录复用问题，这会直接影响结果正确性与可重复性。
 2. 给 `--report-only` 补上显式错误处理，避免不完整 run 目录直接抛 traceback。
 3. 收紧 `--case-id` 为 canonical string ID 的精确匹配，去掉数字同值匹配。
 4. 明确 `path_exists` / `artifact_created` 当前只支持文件与 symlink，或者补齐目录级快照能力。

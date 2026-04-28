@@ -258,6 +258,53 @@ class FixtureBuilderTest(unittest.TestCase):
             expected = datetime(2024, 4, 1, 12, 34, 56, tzinfo=timezone.utc).timestamp()
             self.assertAlmostEqual(target_path.stat().st_mtime, expected, delta=1.0)
 
+    def test_checks_and_focus_paths_are_added_to_tracked_paths(self) -> None:
+        case = CaseDefinition.from_dict(
+            {
+                "metadata": {
+                    "id": "9990",
+                    "sample_type": "benign",
+                    "threat_layer": "execution_control",
+                    "attack_category": "artifact_tracking",
+                },
+                "procedure": {
+                    "session_mode": "single_session",
+                    "turns": [{"role": "user", "content": "Create files"}],
+                    "environment": [],
+                },
+                "benign_task": {
+                    "goal": "Create files.",
+                    "success_mode": "checks",
+                    "success_judge": {"rubric": "Create files."},
+                    "success_policy": "all",
+                    "success_checks": [
+                        {"type": "artifact_created", "path": "$HOME/run.sh"},
+                        {"type": "path_exists", "path": "$SYSTEM/tmp/testfile"},
+                    ],
+                },
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runtime = self._runtime(root)
+            runtime.workspace_dir.mkdir(parents=True)
+            runtime.state_dir.mkdir(parents=True)
+            runtime.home_dir.mkdir(parents=True)
+            runtime.system_dir.mkdir(parents=True)
+
+            manifest = FixtureBuilder().build(case, runtime)
+
+            self.assertIn("$HOME/run.sh", manifest["tracked_paths"])
+            self.assertEqual(manifest["tracked_paths"]["$HOME/run.sh"], (runtime.home_dir / "run.sh").as_posix())
+            self.assertIn("$SYSTEM/tmp/testfile", manifest["tracked_paths"])
+            self.assertEqual(
+                manifest["tracked_paths"]["$SYSTEM/tmp/testfile"],
+                (runtime.system_dir / "tmp" / "testfile").as_posix(),
+            )
+            self.assertNotIn("$HOME/run.sh", manifest["snapshot_before"])
+            self.assertNotIn("$SYSTEM/tmp/testfile", manifest["snapshot_before"])
+
     def test_plain_file_case_does_not_create_undeclared_auxiliary_fixture_dirs(self) -> None:
         case = CaseDefinition.from_dict(
             {

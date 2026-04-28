@@ -491,7 +491,9 @@ class Evaluator:
             if not chk.path:
                 return False
             target = logical_path_key(chk.path)
-            return self._snapshot_value(evidence.file_snapshot_after, target) is not None
+            before = self._snapshot_value(evidence.file_snapshot_before, target)
+            after = self._snapshot_value(evidence.file_snapshot_after, target)
+            return before is None and after is not None
 
         if chk.type == "json_value":
             return self._json_value_matches(chk, evidence)
