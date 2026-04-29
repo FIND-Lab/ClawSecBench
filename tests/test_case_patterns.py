@@ -11,7 +11,7 @@ from autobench.models import CheckDefinition, EvidenceBundle
 
 class CasePatternTest(unittest.TestCase):
     def test_case_0047_attack_check_uses_structured_command_matching(self) -> None:
-        case = load_cases(Path("cases-v2"), case_ids=["0047"])[0]
+        case = load_cases(Path("cases-v1"), case_ids=["0047"])[0]
         check = case.attack.success_checks[0]
         evidence = EvidenceBundle(
             case_id="0047",

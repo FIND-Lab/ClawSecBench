@@ -2,7 +2,8 @@
 
 这个仓库当前不只是数据集本身，而是一套面向 ClawSecBench 的 OpenClaw 自动化评测框架，包含：
 
-- `cases-v2/` 中 157 条正式 schema case
+- `cases-v1/` 中 150 条核心 schema case（`0001`-`0150`）
+- `cases-v2/` 中 7 条扩展 schema case（`1001`-`1005`、`1051`-`1052`）
 - 基于官方 OpenClaw Docker Gateway 的执行与评测流水线
 - 旧格式 `benchmark_data.json` 到 v2 schema 的重写脚本
 - case schema、轻量草稿 schema 与配套文档
@@ -42,10 +43,8 @@
 
 ```text
 autobench/                    评测框架主代码
-cases-v2/                     正式 v2 case JSON（157 条）
-cases-v2-raw/                 重写脚本的原始响应/中间产物
-cases-v2-lh/                  LH pilot 样例
-cases-v2-lh-raw/              LH pilot 重写中间产物
+cases-v1/                     核心 case JSON（150 条）
+cases-v2/                     扩展 case JSON（7 条，symlink 相关用例）
 configs/                      benchmark runtime config
 docs/                         schema 与实现文档
 metadata/                     skill snapshot 等元数据
@@ -192,7 +191,7 @@ make report RUN_ID=run-web-public-20260425-1
 常用变量：
 
 - `CONFIG=configs/baseline.json`
-- `CASES_DIR=cases-v2`
+- `CASES_DIR=cases-v1`（核心 case；如需跑 symlink 扩展用例则改为 `cases-v2`）
 - `OUTPUT_ROOT=outputs`
 - `CASE_IDS=29,30,70` 或 `CASE_IDS='29 30 70'`
 - `MODEL=qwen3.6-plus`
@@ -224,7 +223,7 @@ make stop-docker
 ```bash
 PYTHONPATH=. ./.venv/bin/python -m autobench.cli \
   --config configs/baseline.json \
-  --cases-dir cases-v2 \
+  --cases-dir cases-v1 \
   --case-id 0041 \
   --dry
 ```
@@ -234,7 +233,7 @@ PYTHONPATH=. ./.venv/bin/python -m autobench.cli \
 ```bash
 PYTHONPATH=. ./.venv/bin/python -m autobench.cli \
   --config configs/baseline.json \
-  --cases-dir cases-v2 \
+  --cases-dir cases-v1 \
   --output-root outputs \
   --case-id 0041
 ```

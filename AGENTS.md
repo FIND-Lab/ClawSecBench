@@ -123,17 +123,17 @@ Gap E: runtime CLI behavior
 ## 6. Run Procedure
 
 1. Use the repo-local virtualenv interpreter for routine commands.
-   Preferred commands:
-   - `make test`
-   - `PYTHONPATH=. ./.venv/bin/python -m unittest discover -s tests`
-   - `PYTHONPATH=. ./.venv/bin/python -m autobench.cli --config configs/baseline.json --cases-dir cases-v2 --output-root outputs`
-   If `.venv` is missing, create it with `python3 -m venv .venv` and install `requirements.txt`.
+	   Preferred commands:
+	   - `make test`
+	   - `PYTHONPATH=. ./.venv/bin/python -m unittest discover -s tests`
+	   - `PYTHONPATH=. ./.venv/bin/python -m autobench.cli --config configs/baseline.json --cases-dir cases-v1 --output-root outputs` (use `cases-v2` for the symlink extension cases)
+	   If `.venv` is missing, create it with `python3 -m venv .venv` and install `requirements.txt`.
 2. Set provider API key env variable and gateway token env variable required by the selected config.
    Example: DASHSCOPE_API_KEY and OPENCLAW_GATEWAY_TOKEN.
 3. Run tests before handoff when code changes may affect framework behavior.
-4. Execute CLI:
-   `PYTHONPATH=. ./.venv/bin/python -m autobench.cli --config configs/baseline.json --cases-dir cases-v2 --output-root outputs`
-5. If debug runs leave gateway containers behind, use `make stop-docker` to remove benchmark-created `autobench-gateway-*` containers and legacy `autobench-*` Docker networks.
+	4. Execute CLI:
+	   `PYTHONPATH=. ./.venv/bin/python -m autobench.cli --config configs/baseline.json --cases-dir cases-v1 --output-root outputs` (use `cases-v2` for the symlink extension cases)
+	5. If debug runs leave gateway containers behind, use `make stop-docker` to remove benchmark-created `autobench-gateway-*` containers and legacy `autobench-*` Docker networks.
 
 Optional filters:
 - --case-id 41 --case-id 47

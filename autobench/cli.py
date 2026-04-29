@@ -13,7 +13,7 @@ from .settings import build_run_config
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="OpenClaw Docker AutoBench")
     parser.add_argument("--config", default=None, help="Path to benchmark runtime config JSON")
-    parser.add_argument("--cases-dir", default="cases-v2", help="Cases directory")
+    parser.add_argument("--cases-dir", default="cases-v1", help="Cases directory")
     parser.add_argument("--output-root", default="outputs", help="Run output root")
     parser.add_argument("--run-id", default=None, help="Optional run id")
     parser.add_argument("--case-id", action="append", type=str, dest="case_ids", default=[])

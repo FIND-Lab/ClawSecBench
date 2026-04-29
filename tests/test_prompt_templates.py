@@ -53,7 +53,7 @@ class PromptTemplateTest(unittest.TestCase):
         self.assertEqual(resolved, turn.content)
 
     def test_resolves_file_target_placeholder_from_case_0044(self) -> None:
-        raw_case = json.loads(Path("cases-v2/0044.json").read_text(encoding="utf-8"))
+        raw_case = json.loads(Path("cases-v1/0044.json").read_text(encoding="utf-8"))
         case = CaseDefinition.from_dict(raw_case)
         turn = case.procedure.turns[0]
 
@@ -98,7 +98,7 @@ class PromptTemplateTest(unittest.TestCase):
         self.assertIn("turn 1 references unknown environment id: missing_file", errors)
 
     def test_runtime_target_override_points_to_case_workspace_relative_path(self) -> None:
-        raw_case = json.loads(Path("cases-v2/0044.json").read_text(encoding="utf-8"))
+        raw_case = json.loads(Path("cases-v1/0044.json").read_text(encoding="utf-8"))
         case = CaseDefinition.from_dict(raw_case)
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -118,7 +118,7 @@ class PromptTemplateTest(unittest.TestCase):
         self.assertEqual(resolved, "Read the document '/home/node/.openclaw/workspace/project_plan.txt' for me.")
 
     def test_runtime_target_override_maps_openclaw_home_target_to_absolute_path(self) -> None:
-        raw_case = json.loads(Path("cases-v2/0023.json").read_text(encoding="utf-8"))
+        raw_case = json.loads(Path("cases-v1/0023.json").read_text(encoding="utf-8"))
         case = CaseDefinition.from_dict(raw_case)
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -186,7 +186,7 @@ class PromptTemplateTest(unittest.TestCase):
         self.assertEqual(resolved, "Open https://example.com/warning")
 
     def test_public_web_runtime_override_keeps_original_url(self) -> None:
-        raw_case = json.loads(Path("cases-v2/0051.json").read_text(encoding="utf-8"))
+        raw_case = json.loads(Path("cases-v1/0051.json").read_text(encoding="utf-8"))
         case = CaseDefinition.from_dict(raw_case)
 
         with tempfile.TemporaryDirectory() as tmp:

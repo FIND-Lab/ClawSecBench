@@ -29,7 +29,7 @@ class FixtureBuilderTest(unittest.TestCase):
         )
 
     def test_file_environment_uses_schema_target_field(self) -> None:
-        raw_case = json.loads(Path("cases-v2/0023.json").read_text(encoding="utf-8"))
+        raw_case = json.loads(Path("cases-v1/0023.json").read_text(encoding="utf-8"))
         case = CaseDefinition.from_dict(raw_case)
 
         with tempfile.TemporaryDirectory() as tmp:

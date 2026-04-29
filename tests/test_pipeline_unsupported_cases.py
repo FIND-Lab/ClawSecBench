@@ -179,7 +179,7 @@ class PipelineUnsupportedCasesTest(unittest.TestCase):
             pipeline = AutoBenchPipeline()
             run_config = RunConfig(
                 run_id="skip-unsupported",
-                cases_dir=Path("cases-v2"),
+                cases_dir=Path("cases-v1"),
                 output_root=output_root,
                 profile=profile,
                 verbose=False,
@@ -305,7 +305,7 @@ class PipelineUnsupportedCasesTest(unittest.TestCase):
             pipeline = AutoBenchPipeline()
             run_config = RunConfig(
                 run_id="runtime-errors",
-                cases_dir=Path("cases-v2"),
+                cases_dir=Path("cases-v1"),
                 output_root=output_root,
                 profile=profile,
                 verbose=False,
@@ -444,7 +444,7 @@ class PipelineUnsupportedCasesTest(unittest.TestCase):
             pipeline = AutoBenchPipeline()
             run_config = RunConfig(
                 run_id="parallel-supported",
-                cases_dir=Path("cases-v2"),
+                cases_dir=Path("cases-v1"),
                 output_root=output_root,
                 profile=profile,
                 verbose=False,

@@ -167,13 +167,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=ROOT / "cases-v2",
+        default=ROOT / "cases-v1",
         help="Directory for rewritten case JSON files.",
     )
     parser.add_argument(
         "--raw-response-dir",
         type=Path,
-        default=ROOT / "cases-v2-raw",
+        default=ROOT / "cases-v1-raw",
         help="Directory for raw API responses and prompts.",
     )
     parser.add_argument(

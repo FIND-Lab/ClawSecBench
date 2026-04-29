@@ -10,7 +10,7 @@ from autobench.case_loader import CaseLoaderError, load_cases
 
 class CaseLoaderFilteringTest(unittest.TestCase):
     def test_selected_case_ids_skip_unrelated_invalid_cases(self) -> None:
-        valid_case = json.loads(Path("cases-v2/0041.json").read_text(encoding="utf-8"))
+        valid_case = json.loads(Path("cases-v1/0041.json").read_text(encoding="utf-8"))
         invalid_case = {
             "metadata": {
                 "id": "9992",

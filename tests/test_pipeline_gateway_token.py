@@ -23,7 +23,7 @@ class PipelineGatewayTokenTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             run_config = RunConfig(
                 run_id="token-test",
-                cases_dir=Path("cases-v2"),
+                cases_dir=Path("cases-v1"),
                 output_root=Path(tmp),
                 profile=profile,
                 verbose=False,
@@ -94,7 +94,7 @@ class PipelineGatewayTokenTest(unittest.TestCase):
             run_dir = Path(tmp)
             run_config = RunConfig(
                 run_id="timeout-override-test",
-                cases_dir=Path("cases-v2"),
+                cases_dir=Path("cases-v1"),
                 output_root=run_dir,
                 profile=profile,
                 verbose=False,

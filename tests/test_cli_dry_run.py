@@ -116,7 +116,7 @@ class PipelineDryRunTest(unittest.TestCase):
             output_root = Path(tmp)
             run_config = RunConfig(
                 run_id="dry-run-test",
-                cases_dir=Path("cases-v2"),
+                cases_dir=Path("cases-v1"),
                 output_root=output_root,
                 profile=profile,
                 verbose=False,

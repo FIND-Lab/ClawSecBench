@@ -19,7 +19,7 @@ API_KEY_ENV := DASHSCOPE_API_KEY
 # 运行配置文件
 CONFIG ?= configs/baseline.json
 # case 目录
-CASES_DIR ?= cases-v2
+CASES_DIR ?= cases-v1
 # 输出根目录
 OUTPUT_ROOT ?= outputs
 # 指定 run id；为空则自动生成
@@ -34,9 +34,9 @@ TEST ?=
 # rewrite 输入的原始 benchmark 数据
 INPUT ?= benchmark_data.json
 # rewrite 输出的 case 目录
-OUTPUT_DIR ?= cases-v2
+OUTPUT_DIR ?= cases-v1
 # rewrite 输出的原始模型响应目录
-RAW_RESPONSE_DIR ?= cases-v2-raw
+RAW_RESPONSE_DIR ?= cases-v1-raw
 # rewrite 额外上下文文件列表
 CONTEXT_FILES ?=
 # rewrite 使用的模型名；为空时回退到 MODEL，再回退到 qwen3.6-plus
