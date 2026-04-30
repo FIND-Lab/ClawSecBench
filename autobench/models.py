@@ -232,7 +232,6 @@ class GatewayProfile:
 class ProviderProfile:
     name: str = "dashscope"
     base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    base_url_env: str | None = "DASHSCOPE_BASE_URL"
     api_key_env: str = "DASHSCOPE_API_KEY"
     model: str = "dashscope/qwen3.6-plus"
     api: str = "openai-completions"

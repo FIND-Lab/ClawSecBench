@@ -155,6 +155,7 @@ class ProfileAndRuntimeTest(unittest.TestCase):
         self.assertIn("DASHSCOPE_API_KEY", service["environment"])
         self.assertIn("OPENCLAW_GATEWAY_TOKEN", service["environment"])
         self.assertIn("OPENCLAW_SKIP_CHANNELS=1", service["environment"])
+        self.assertNotIn("DASHSCOPE_BASE_URL", service["environment"])
         self.assertEqual(
             service["command"],
             ["node", "dist/index.js", "gateway", "--bind", "lan", "--port", "18789"],

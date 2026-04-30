@@ -20,7 +20,6 @@
   "provider": {
     "name": "dashscope",
     "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    "base_url_env": "DASHSCOPE_BASE_URL",
     "api_key_env": "DASHSCOPE_API_KEY",
     "model": "dashscope/qwen3.6-plus",
     "api": "openai-completions",

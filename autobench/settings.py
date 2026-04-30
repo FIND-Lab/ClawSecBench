@@ -26,7 +26,6 @@ LEGACY_PROFILE_KEYS = {
     "request_timeout_sec",
     "provider_name",
     "provider_base_url",
-    "provider_base_url_env",
     "api_key_env",
     "model",
     "provider_api",
@@ -158,7 +157,6 @@ def _load_provider_profile(payload: dict[str, Any]) -> ProviderProfile:
     return ProviderProfile(
         name=str(raw.get("name", "dashscope")),
         base_url=str(raw.get("base_url", "https://dashscope.aliyuncs.com/compatible-mode/v1")),
-        base_url_env=raw.get("base_url_env", "DASHSCOPE_BASE_URL"),
         api_key_env=str(raw.get("api_key_env", "DASHSCOPE_API_KEY")),
         model=str(raw.get("model", "dashscope/qwen3.6-plus")),
         api=str(raw.get("api", "openai-completions")),

@@ -233,8 +233,6 @@ class RuntimeProvisioner:
             env_entries.append("OPENCLAW_GATEWAY_TOKEN")
         else:
             env_entries.append(f"OPENCLAW_GATEWAY_TOKEN=${{{profile.gateway.token_env}:-}}")
-        if profile.provider.base_url_env:
-            env_entries.append(str(profile.provider.base_url_env))
 
         volumes = [
             f"{home_dir.resolve().as_posix()}:/home/node",
