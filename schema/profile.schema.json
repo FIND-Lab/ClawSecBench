@@ -1,0 +1,186 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://clawsecbench.org/schema/profile.schema.json",
+  "title": "ClawSecBench Runtime Profile Schema",
+  "description": "Schema for grouped benchmark runtime profiles used by configs/*.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name"
+  ],
+  "properties": {
+    "name": {
+      "$ref": "#/$defs/nonEmptyString"
+    },
+    "runtime": {
+      "$ref": "#/$defs/runtime"
+    },
+    "gateway": {
+      "$ref": "#/$defs/gateway"
+    },
+    "provider": {
+      "$ref": "#/$defs/provider"
+    },
+    "judge": {
+      "$ref": "#/$defs/judge"
+    },
+    "openclaw": {
+      "$ref": "#/$defs/openclaw"
+    }
+  },
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trimmedString": {
+      "type": "string",
+      "pattern": ".*\\S.*"
+    },
+    "envVarName": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "nullableTrimmedString": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/trimmedString"
+        }
+      ]
+    },
+    "runtimeResources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cpus": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "memory": {
+          "$ref": "#/$defs/trimmedString"
+        },
+        "pids_limit": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "compose"
+          ]
+        },
+        "gateway_image": {
+          "$ref": "#/$defs/trimmedString"
+        },
+        "gateway_internal_port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "gateway_host_port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "gateway_bind": {
+          "$ref": "#/$defs/trimmedString"
+        },
+        "service_name": {
+          "$ref": "#/$defs/trimmedString"
+        },
+        "gateway_log_level": {
+          "$ref": "#/$defs/trimmedString"
+        },
+        "gateway_verbose": {
+          "type": "boolean"
+        },
+        "resources": {
+          "$ref": "#/$defs/runtimeResources"
+        }
+      }
+    },
+    "gateway": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "agent_target": {
+          "$ref": "#/$defs/trimmedString"
+        },
+        "token_env": {
+          "$ref": "#/$defs/envVarName"
+        },
+        "request_timeout_sec": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/trimmedString"
+        },
+        "base_url": {
+          "$ref": "#/$defs/trimmedString"
+        },
+        "api_key_env": {
+          "$ref": "#/$defs/envVarName"
+        },
+        "model": {
+          "$ref": "#/$defs/trimmedString"
+        },
+        "api": {
+          "$ref": "#/$defs/trimmedString"
+        },
+        "auth": {
+          "$ref": "#/$defs/trimmedString"
+        }
+      }
+    },
+    "judge": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "base_url": {
+          "$ref": "#/$defs/nullableTrimmedString"
+        },
+        "api_key_env": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/envVarName"
+            }
+          ]
+        },
+        "model": {
+          "$ref": "#/$defs/nullableTrimmedString"
+        },
+        "cache": {
+          "type": "boolean"
+        }
+      }
+    },
+    "openclaw": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "extra_config": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

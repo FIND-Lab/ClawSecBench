@@ -59,16 +59,16 @@ class ProfileAndRuntimeTest(unittest.TestCase):
         self.assertEqual(profile.gateway.request_timeout_sec, 300)
         self.assertEqual(profile.gateway.agent_target, "openclaw/default")
 
-    def test_rejects_legacy_flat_profile(self) -> None:
+    def test_rejects_unknown_top_level_profile_keys(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            profile_path = Path(tmp) / "legacy.json"
+            profile_path = Path(tmp) / "profile.json"
             profile_path.write_text(
                 json.dumps(
                     {
-                        "name": "legacy",
-                        "provider_base_url": "https://legacy.example/v1",
-                        "model": "openai/legacy",
-                        "api_key_env": "LEGACY_KEY",
+                        "name": "test",
+                        "provider_base_url": "https://ignored.example/v1",
+                        "model": "openai/ignored-model",
+                        "api_key_env": "IGNORED_KEY",
                         "gateway_image": "openclaw/openclaw:2026.4.24",
                         "gateway_internal_port": 8080,
                         "gateway_host_port": 18080,
@@ -77,10 +77,10 @@ class ProfileAndRuntimeTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with self.assertRaisesRegex(ValueError, "unsupported legacy flat keys"):
+            with self.assertRaisesRegex(ValueError, "profile is invalid against schema"):
                 load_api_profile(profile_path)
 
-    def test_rejects_grouped_judge_enabled_flag(self) -> None:
+    def test_rejects_unknown_grouped_judge_field(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             profile_path = Path(tmp) / "profile.json"
             profile_path.write_text(
@@ -95,7 +95,7 @@ class ProfileAndRuntimeTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with self.assertRaisesRegex(ValueError, "judge.enabled is no longer supported"):
+            with self.assertRaisesRegex(ValueError, r"\$\.judge: Additional properties are not allowed"):
                 load_api_profile(profile_path)
 
     def test_rejects_invalid_runtime_resources_section(self) -> None:
@@ -115,7 +115,25 @@ class ProfileAndRuntimeTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with self.assertRaisesRegex(ValueError, "runtime.resources.cpus must be > 0"):
+            with self.assertRaisesRegex(ValueError, r"\$\.runtime\.resources\.cpus"):
+                load_api_profile(profile_path)
+
+    def test_rejects_blank_gateway_log_level_in_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            profile_path = Path(tmp) / "profile.json"
+            profile_path.write_text(
+                json.dumps(
+                    {
+                        "name": "test",
+                        "runtime": {
+                            "gateway_log_level": "   ",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, r"\$\.runtime\.gateway_log_level"):
                 load_api_profile(profile_path)
 
     def test_renders_official_gateway_config_and_compose(self) -> None:

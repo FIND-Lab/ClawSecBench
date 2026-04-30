@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
+
+from jsonschema.validators import validator_for
 
 from .models import (
     ApiProfile,
@@ -14,29 +17,8 @@ from .models import (
     RuntimeResourcesProfile,
 )
 
-
-LEGACY_PROFILE_KEYS = {
-    "runtime_mode",
-    "gateway_image",
-    "gateway_internal_port",
-    "gateway_host_port",
-    "gateway_bind",
-    "agent_target",
-    "gateway_token_env",
-    "request_timeout_sec",
-    "provider_name",
-    "provider_base_url",
-    "api_key_env",
-    "model",
-    "provider_api",
-    "provider_auth",
-    "judge_enabled",
-    "judge_base_url",
-    "judge_model",
-    "judge_api_key_env",
-    "judge_cache",
-    "extra_config",
-}
+ROOT = Path(__file__).resolve().parents[1]
+PROFILE_SCHEMA_PATH = ROOT / "schema" / "profile.schema.json"
 
 
 def load_api_profile(
@@ -54,10 +36,10 @@ def load_api_profile(
     judge_api_key_env: str | None = None,
 ) -> ApiProfile:
     payload = json.loads(profile_path.read_text(encoding="utf-8"))
-    legacy_keys = sorted(key for key in LEGACY_PROFILE_KEYS if key in payload)
-    if legacy_keys:
-        joined = ", ".join(legacy_keys)
-        raise ValueError(f"profile uses unsupported legacy flat keys: {joined}")
+    schema_errors = validate_profile_schema(payload)
+    if schema_errors:
+        joined = "\n- ".join(schema_errors)
+        raise ValueError(f"profile is invalid against schema:\n- {joined}")
     profile = ApiProfile(
         name=str(payload["name"]),
         runtime=_load_runtime_profile(payload),
@@ -89,6 +71,26 @@ def load_api_profile(
         profile.judge.api_key_env = judge_api_key_env
 
     return profile
+
+
+@lru_cache(maxsize=1)
+def _profile_schema_validator() -> Any:
+    schema = json.loads(PROFILE_SCHEMA_PATH.read_text(encoding="utf-8"))
+    validator_cls = validator_for(schema)
+    validator_cls.check_schema(schema)
+    return validator_cls(schema)
+
+
+def validate_profile_schema(raw: Any) -> list[str]:
+    validator = _profile_schema_validator()
+    errors: list[str] = []
+    for error in sorted(validator.iter_errors(raw), key=_validation_error_sort_key):
+        location = _format_validation_path(error.absolute_path)
+        if location == "$":
+            errors.append(error.message)
+        else:
+            errors.append(f"{location}: {error.message}")
+    return errors
 
 
 def _load_runtime_profile(payload: dict[str, Any]) -> RuntimeProfile:
@@ -166,8 +168,6 @@ def _load_provider_profile(payload: dict[str, Any]) -> ProviderProfile:
 
 def _load_judge_profile(payload: dict[str, Any]) -> JudgeProfile:
     raw = _load_section(payload, "judge")
-    if "enabled" in raw:
-        raise ValueError("judge.enabled is no longer supported; use --disable-primary-success-judge at runtime instead")
     return JudgeProfile(
         base_url=raw.get("base_url"),
         api_key_env=raw.get("api_key_env"),
@@ -189,6 +189,20 @@ def _load_section(payload: dict[str, Any], key: str) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise ValueError(f"profile section {key!r} must be an object")
     return raw
+
+
+def _validation_error_sort_key(error: Any) -> tuple[str, ...]:
+    return tuple(str(segment) for segment in error.absolute_path)
+
+
+def _format_validation_path(path: Any) -> str:
+    location = "$"
+    for segment in path:
+        if isinstance(segment, int):
+            location += f"[{segment}]"
+        else:
+            location += f".{segment}"
+    return location
 
 
 def build_run_config(
