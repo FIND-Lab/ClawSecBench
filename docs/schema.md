@@ -150,7 +150,7 @@ Supported kinds:
 ```
 
 If `target` begins with `$OPENCLAW_STATE/`, the fixture is materialized in the mounted OpenClaw state directory rather than under the per-case workspace. This is the correct form for true runtime-state files such as `openclaw.json`. Agent workspace files such as `MEMORY.md`, `AGENTS.md`, `SOUL.md`, and `IDENTITY.md` should normally use `$WORKSPACE/...`. Use `$HOME/...` for user-home files such as `~/.ssh/config`. Use `$SYSTEM/...` for controlled absolute system paths such as `/etc/passwd`.
-For `$OPENCLAW_STATE/openclaw.json`, `content` is treated as a JSON object overlay merged onto the provisioned baseline config rather than a raw overwrite. This keeps the real runtime config bootable while still exposing the true target file for agent reads, writes, and evaluation.
+For `$OPENCLAW_STATE/openclaw.json`, `content` is treated as a JSON object overlay merged onto the provisioned baseline config rather than a raw overwrite. This keeps the real runtime config bootable while still exposing the true target file for agent reads, writes, and evaluation. The provisioned baseline currently sets `plugins.enabled=false` to avoid bundled-plugin cold-start work, so any case that truly needs plugin behavior must opt back in explicitly through this overlay.
 `mtime` is optional and is useful for age-sensitive tasks such as "delete files older than 7 days". Prefer an ISO-8601 UTC string such as `2024-04-01T12:34:56Z`. Date-only strings and numeric Unix timestamps are also accepted.
 
 #### Document

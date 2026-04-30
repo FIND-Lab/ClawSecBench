@@ -8,8 +8,7 @@ import subprocess
 import time
 from pathlib import Path
 from typing import Any
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.parse import urlsplit
 
 from .case_ids import case_dirname
 from .logging_utils import ProgressLogger
@@ -203,11 +202,10 @@ class RuntimeProvisioner:
                 "mdns": {"mode": "off"},
             },
             "plugins": {
-                "entries": {
-                    # The bundled bonjour discovery plugin can crash inside
-                    # containerized runs with CIAO probing failures.
-                    "bonjour": {"enabled": False},
-                }
+                # Benchmarks currently do not depend on bundled plugins, and
+                # disabling them avoids plugin-runtime-deps staging during cold
+                # starts. Cases can still opt back in via openclaw.json overlay.
+                "enabled": False,
             },
         }
         return deep_merge(base, profile.openclaw_extra_config)
@@ -228,6 +226,7 @@ class RuntimeProvisioner:
             "HOME=/home/node",
             "TERM=xterm-256color",
             "OPENCLAW_AGENT_DIR=/home/node/.openclaw",
+            "OPENCLAW_SKIP_CHANNELS=1",
             profile.provider.api_key_env,
         ]
         if profile.gateway.token_env == "OPENCLAW_GATEWAY_TOKEN":
@@ -246,6 +245,21 @@ class RuntimeProvisioner:
         for host_path, container_path in system_mounts or []:
             volumes.append(f"{host_path.resolve().as_posix()}:{container_path}")
 
+        command = ["node", "dist/index.js"]
+        if profile.runtime.gateway_log_level:
+            command.extend(["--log-level", profile.runtime.gateway_log_level])
+        command.append("gateway")
+        if profile.runtime.gateway_verbose:
+            command.append("--verbose")
+        command.extend(
+            [
+                "--bind",
+                profile.runtime.gateway_bind,
+                "--port",
+                str(profile.runtime.gateway_internal_port),
+            ]
+        )
+
         service = {
             "image": profile.runtime.gateway_image,
             "container_name": container_name,
@@ -253,15 +267,7 @@ class RuntimeProvisioner:
             # a published localhost port, so a per-project compose network adds no
             # value and can exhaust Docker's default subnet pool during full runs.
             "network_mode": "bridge",
-            "command": [
-                "node",
-                "dist/index.js",
-                "gateway",
-                "--bind",
-                profile.runtime.gateway_bind,
-                "--port",
-                str(profile.runtime.gateway_internal_port),
-            ],
+            "command": command,
             "ports": [
                 f"127.0.0.1:{gateway_host_port}:{profile.runtime.gateway_internal_port}",
             ],
@@ -388,10 +394,9 @@ class RuntimeProvisioner:
         while time.time() < deadline:
             for url in health_urls:
                 try:
-                    with urlopen(Request(url, method="GET"), timeout=3) as response:
-                        if response.status < 500:
-                            return
-                except (HTTPError, URLError, TimeoutError, OSError, http.client.HTTPException):
+                    if _probe_health_url(url, timeout_sec=3):
+                        return
+                except (TimeoutError, OSError, ValueError, http.client.HTTPException):
                     pass
             now = time.time()
             if now - last_progress >= 5:
@@ -447,6 +452,29 @@ class RuntimeProvisioner:
         sections.extend(["", "docker compose logs --tail 120:", _format_completed_process(logs)])
 
         return "\n".join(sections)
+
+
+def _probe_health_url(url: str, *, timeout_sec: float) -> bool:
+    parts = urlsplit(url)
+    if parts.scheme not in {"http", "https"}:
+        raise ValueError(f"unsupported health check scheme: {parts.scheme or '<empty>'}")
+    if not parts.hostname:
+        raise ValueError("health check URL is missing hostname")
+
+    port = parts.port or (443 if parts.scheme == "https" else 80)
+    target = parts.path or "/"
+    if parts.query:
+        target = f"{target}?{parts.query}"
+
+    connection_cls = http.client.HTTPSConnection if parts.scheme == "https" else http.client.HTTPConnection
+    connection = connection_cls(parts.hostname, port, timeout=timeout_sec)
+    try:
+        connection.request("GET", target)
+        response = connection.getresponse()
+        response.read()
+        return response.status < 500
+    finally:
+        connection.close()
 
 
 def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:

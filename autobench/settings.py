@@ -94,13 +94,20 @@ def load_api_profile(
 
 def _load_runtime_profile(payload: dict[str, Any]) -> RuntimeProfile:
     raw = _load_section(payload, "runtime")
+    gateway_log_level = raw.get("gateway_log_level")
+    if gateway_log_level is not None:
+        gateway_log_level = str(gateway_log_level).strip()
+        if not gateway_log_level:
+            raise ValueError("runtime.gateway_log_level must be a non-empty string")
     return RuntimeProfile(
         mode=str(raw.get("mode", "compose")),
-        gateway_image=str(raw.get("gateway_image", "ghcr.io/openclaw/openclaw:latest")),
+        gateway_image=str(raw.get("gateway_image", "ghcr.io/openclaw/openclaw:2026.4.24")),
         gateway_internal_port=int(raw.get("gateway_internal_port", 18789)),
         gateway_host_port=int(raw.get("gateway_host_port", 18789)),
         gateway_bind=str(raw.get("gateway_bind", "lan")),
         service_name=str(raw.get("service_name", "openclaw-gateway")),
+        gateway_log_level=gateway_log_level,
+        gateway_verbose=bool(raw.get("gateway_verbose", False)),
         resources=_load_runtime_resources(raw),
     )
 

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import http.server
 import json
 import os
 import tempfile
+import threading
 import unittest
 from pathlib import Path
+from unittest import mock
 
-from autobench.models import CaseDefinition
+from autobench.models import CaseDefinition, RuntimeHandle
 from autobench.runtime_provisioner import RuntimeProvisioner
 from autobench.settings import load_api_profile
 
@@ -20,7 +23,7 @@ class ProfileAndRuntimeTest(unittest.TestCase):
                     {
                         "name": "test",
                         "runtime": {
-                            "gateway_image": "ghcr.io/openclaw/openclaw:latest",
+                            "gateway_image": "ghcr.io/openclaw/openclaw:2026.4.24",
                             "resources": {
                                 "cpus": 1.5,
                                 "memory": "3g",
@@ -66,7 +69,7 @@ class ProfileAndRuntimeTest(unittest.TestCase):
                         "provider_base_url": "https://legacy.example/v1",
                         "model": "openai/legacy",
                         "api_key_env": "LEGACY_KEY",
-                        "gateway_image": "openclaw/openclaw:latest",
+                        "gateway_image": "openclaw/openclaw:2026.4.24",
                         "gateway_internal_port": 8080,
                         "gateway_host_port": 18080,
                     }
@@ -137,7 +140,7 @@ class ProfileAndRuntimeTest(unittest.TestCase):
         self.assertTrue(openclaw_config["agents"]["defaults"]["skipBootstrap"])
         self.assertEqual(openclaw_config["agents"]["defaults"]["model"]["primary"], "dashscope/qwen3.6-plus")
         self.assertEqual(openclaw_config["discovery"]["mdns"]["mode"], "off")
-        self.assertFalse(openclaw_config["plugins"]["entries"]["bonjour"]["enabled"])
+        self.assertFalse(openclaw_config["plugins"]["enabled"])
         self.assertEqual(
             openclaw_config["models"]["providers"]["dashscope"]["baseUrl"],
             "https://dashscope.aliyuncs.com/compatible-mode/v1",
@@ -145,16 +148,140 @@ class ProfileAndRuntimeTest(unittest.TestCase):
         self.assertEqual(openclaw_config["models"]["providers"]["dashscope"]["apiKey"], "${DASHSCOPE_API_KEY}")
         self.assertEqual(openclaw_config["models"]["providers"]["dashscope"]["models"][0]["id"], "qwen3.6-plus")
         service = compose["services"]["openclaw-gateway"]
-        self.assertEqual(service["image"], "ghcr.io/openclaw/openclaw:latest")
+        self.assertEqual(service["image"], "ghcr.io/openclaw/openclaw:2026.4.24")
         self.assertEqual(service["user"], f"{os.getuid()}:{os.getgid()}")
         self.assertEqual(service["network_mode"], "bridge")
         self.assertIn("127.0.0.1:18789:18789", service["ports"])
         self.assertIn("DASHSCOPE_API_KEY", service["environment"])
         self.assertIn("OPENCLAW_GATEWAY_TOKEN", service["environment"])
-        self.assertEqual(service["cpus"], 2.0)
-        self.assertEqual(service["mem_limit"], "4g")
+        self.assertIn("OPENCLAW_SKIP_CHANNELS=1", service["environment"])
+        self.assertEqual(
+            service["command"],
+            ["node", "dist/index.js", "gateway", "--bind", "lan", "--port", "18789"],
+        )
+        self.assertEqual(service["cpus"], 4.0)
+        self.assertEqual(service["mem_limit"], "8g")
         self.assertEqual(service["pids_limit"], 512)
         self.assertTrue(any(volume.endswith(":/home/node") for volume in service["volumes"]))
+
+    def test_renders_gateway_debug_logging_flags_when_enabled(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            profile_path = Path(tmp) / "profile.json"
+            profile_path.write_text(
+                json.dumps(
+                    {
+                        "name": "debug",
+                        "runtime": {
+                            "gateway_log_level": "debug",
+                            "gateway_verbose": True,
+                        },
+                        "gateway": {"agent_target": "openclaw/default"},
+                        "provider": {
+                            "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+                            "api_key_env": "DASHSCOPE_API_KEY",
+                            "model": "dashscope/qwen3.6-plus",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            profile = load_api_profile(profile_path)
+            compose = RuntimeProvisioner()._build_compose_file(
+                profile,
+                container_name="autobench-gateway-debug",
+                workspace_dir=Path("/tmp/autobench/workspace"),
+                state_dir=Path("/tmp/autobench/openclaw-state"),
+                home_dir=Path("/tmp/autobench/home"),
+                logs_dir=Path("/tmp/autobench/logs"),
+                gateway_host_port=18789,
+                system_mounts=[],
+            )
+
+        service = compose["services"]["openclaw-gateway"]
+        self.assertEqual(
+            service["command"],
+            [
+                "node",
+                "dist/index.js",
+                "--log-level",
+                "debug",
+                "gateway",
+                "--verbose",
+                "--bind",
+                "lan",
+                "--port",
+                "18789",
+            ],
+        )
+
+    def test_wait_for_gateway_health_bypasses_host_proxy_for_local_gateway(self) -> None:
+        class ReadyHandler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'{"ready":true}')
+
+            def log_message(self, format: str, *args: object) -> None:
+                return
+
+        class ProxyHandler(http.server.BaseHTTPRequestHandler):
+            hits = 0
+
+            def do_GET(self) -> None:
+                type(self).hits += 1
+                self.send_response(502)
+                self.end_headers()
+
+            def log_message(self, format: str, *args: object) -> None:
+                return
+
+        ready_server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), ReadyHandler)
+        proxy_server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), ProxyHandler)
+        ready_thread = threading.Thread(target=ready_server.serve_forever, daemon=True)
+        proxy_thread = threading.Thread(target=proxy_server.serve_forever, daemon=True)
+        ready_thread.start()
+        proxy_thread.start()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            handle = RuntimeHandle(
+                run_dir=root,
+                runtime_dir=root,
+                artifacts_dir=root,
+                workspace_dir=root,
+                state_dir=root,
+                home_dir=root,
+                system_dir=root,
+                logs_dir=root,
+                network_name="autobench-test",
+                container_name="autobench-gateway-test",
+                openclaw_config_path=root / "openclaw.json",
+                gateway_url=f"http://127.0.0.1:{ready_server.server_port}",
+            )
+
+            try:
+                with mock.patch.dict(
+                    os.environ,
+                    {
+                        "ALL_PROXY": f"http://127.0.0.1:{proxy_server.server_port}",
+                        "HTTP_PROXY": f"http://127.0.0.1:{proxy_server.server_port}",
+                        "http_proxy": f"http://127.0.0.1:{proxy_server.server_port}",
+                        "NO_PROXY": "",
+                        "no_proxy": "",
+                    },
+                    clear=False,
+                ):
+                    RuntimeProvisioner()._wait_for_gateway_health(handle, timeout_sec=2)
+            finally:
+                ready_server.shutdown()
+                proxy_server.shutdown()
+                ready_server.server_close()
+                proxy_server.server_close()
+                ready_thread.join(timeout=1)
+                proxy_thread.join(timeout=1)
+
+        self.assertEqual(ProxyHandler.hits, 0)
 
     def test_prepares_exact_system_file_mounts_for_system_targets(self) -> None:
         provisioner = RuntimeProvisioner()

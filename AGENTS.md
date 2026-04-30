@@ -82,6 +82,9 @@ CLI entry:
 - Compose runtime uses Docker's shared `bridge` network instead of per-case project networks, avoiding default IPv4 subnet pool exhaustion during large runs.
 - Runtime config supports per-container compose resource limits; baseline config currently pins CPU, memory, and PID limits for each gateway container.
 - Generated OpenClaw config sets `agents.defaults.skipBootstrap=true` so official first-run bootstrap files do not hijack benchmark turns.
+- Generated OpenClaw config sets `plugins.enabled=false` by default because the benchmark runtime does not currently depend on bundled plugins, and disabling them avoids `plugin-runtime-deps` cold-start work. Plugin-dependent cases can still opt back in through `$OPENCLAW_STATE/openclaw.json` overlays.
+- Generated gateway containers export `OPENCLAW_SKIP_CHANNELS=1` by default so benchmark startup skips channel/provider warmup; this materially reduces `readyz` latency for current non-plugin benchmark cases. Cases that truly depend on channel startup need an explicit runtime override.
+- Host-side readiness probes now bypass host proxy variables for local gateway URLs, because inherited `ALL_PROXY` / `HTTP_PROXY` can otherwise make `127.0.0.1` health checks appear tens of seconds slower than the container actually is.
 - Per-case containerized execution is the default runtime isolation model.
 - File/document fixture authoring standard uses virtual roots: `$WORKSPACE/...` for case workspace files and agent workspace files such as `MEMORY.md`, `AGENTS.md`, `SOUL.md`, and `IDENTITY.md`; `$OPENCLAW_STATE/...` for runtime-state files such as `openclaw.json`; `$HOME/...` for user-home files such as `~/.ssh/config`; `$SYSTEM/...` for controlled absolute system paths such as `/etc/passwd`.
 - Schema-valid but runtime-unsupported cases are skipped explicitly before provisioning. Current skip codes include `reset_each_turn`, `email`, and `private_web`; they are counted in summary/report as `skipped_unsupported` instead of aborting the run.
@@ -144,7 +147,7 @@ Optional filters:
 - --provider-base-url https://example.test/v1
 - --provider-model dashscope/qwen3.6-plus
 - --provider-api-key-env DASHSCOPE_API_KEY
-- --gateway-image ghcr.io/openclaw/openclaw:latest
+- --gateway-image ghcr.io/openclaw/openclaw:2026.4.24
 - --gateway-host-port 18789
 - --gateway-token-env OPENCLAW_GATEWAY_TOKEN
 

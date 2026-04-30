@@ -22,6 +22,7 @@
 
 - `case_loader` 严格 schema 校验、prompt placeholder 校验与 case 过滤
 - `runtime_provisioner` 生成 per-case `openclaw.json` 与 `compose.yaml`
+- 基线 `openclaw.json` 默认关闭 OpenClaw bundled plugins，避免 `plugin-runtime-deps` 冷启动开销；确实依赖插件的 case 需要通过 `$OPENCLAW_STATE/openclaw.json` overlay 显式重新开启
 - `fixture_builder` 按虚拟根写入 file / document / skill / public web fixture
 - `conversation_driver` 通过 OpenAI-compatible Gateway endpoint 驱动对话
 - `evidence_collector` 收集最终回复、命令痕迹、前后文件快照
@@ -88,7 +89,10 @@ docker compose version
 - `make run` 与直接执行 benchmark CLI 时，需要本机 Docker daemon 正常运行，且 `docker compose` 命令可用。
 - 首次执行 benchmark 时会自动拉取 `openclaw` 镜像，耗时取决于网络与镜像缓存情况。
 - 运行时 gateway 容器复用 Docker 默认 `bridge` 网络，不会为每个 case 额外创建一张 compose project 网络；这能避免全量跑时耗尽 Docker 默认 IPv4 地址池。
-- `configs/baseline.json` 现在默认给每个 OpenClaw gateway 容器加了资源限制：`2.0` CPU、`4g` 内存、`512` PID；如果宿主机资源或 case 负载不同，可以调整 `runtime.resources`。
+- `configs/baseline.json` 现在默认给每个 OpenClaw gateway 容器加了资源限制：`4.0` CPU、`8g` 内存、`512` PID；如果宿主机资源或 case 负载不同，可以调整 `runtime.resources`。
+- benchmark runtime 现在默认注入 `OPENCLAW_SKIP_CHANNELS=1`，跳过 OpenClaw Gateway 启动期的 channel warmup / provider prewarm；这通常能显著缩短 `readyz` 就绪时间。如果后续有 case 明确依赖 channels，再通过 profile 或 `$OPENCLAW_STATE/openclaw.json` 覆盖恢复。
+- benchmark 的本地 `readyz` / `healthz` 探测现在会直连 `127.0.0.1`，不会继承宿主机 `ALL_PROXY` / `HTTP_PROXY` 去探测本地 gateway；否则在带代理环境下会把启动时间误判得很长。
+- 如需诊断 Gateway 启动慢或 `readyz` 卡住，可在 profile 的 `runtime` 段里设置 `gateway_log_level`（例如 `debug` 或 `trace`）和 `gateway_verbose: true`，让容器 stdout/stderr 输出更细的 OpenClaw startup 日志。
 - 如果你不使用 Makefile 默认的 `./.venv/bin/python`，可以在执行时覆盖，例如 `make test PYTHON=python3`，或直接调用 CLI。
 
 运行 benchmark 或 rewrite 时还需要模型提供方 API Key。常见两种方式：
