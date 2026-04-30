@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+import http.client
 import json
 import time
 import uuid
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
-from urllib.error import HTTPError
-from urllib.request import Request, urlopen
+from urllib.parse import urlsplit
 
 from .case_ids import case_artifact_name, case_label
 from .logging_utils import ProgressLogger
@@ -115,13 +115,7 @@ class ConversationDriver:
         if gateway_token:
             headers["authorization"] = f"Bearer {gateway_token}"
 
-        req = Request(url, data=body, headers=headers, method="POST")
-        try:
-            with urlopen(req, timeout=request_timeout_sec) as resp:
-                return json.loads(resp.read().decode("utf-8"))
-        except HTTPError as exc:
-            content = exc.read().decode("utf-8", errors="replace")
-            raise ConversationDriverError(f"chat call failed: status={exc.code}, body={content}") from exc
+        return _post_json(url, body=body, headers=headers, timeout_sec=request_timeout_sec)
 
 
 def extract_text_from_openai_response(payload: dict[str, Any]) -> str:
@@ -145,3 +139,29 @@ def extract_text_from_openai_response(payload: dict[str, Any]) -> str:
         return output_text
 
     return json.dumps(payload, ensure_ascii=False)
+
+
+def _post_json(url: str, *, body: bytes, headers: dict[str, str], timeout_sec: int) -> dict[str, Any]:
+    parts = urlsplit(url)
+    if parts.scheme not in {"http", "https"}:
+        raise ConversationDriverError(f"unsupported chat URL scheme: {parts.scheme or '<empty>'}")
+    if not parts.hostname:
+        raise ConversationDriverError("chat URL is missing hostname")
+
+    port = parts.port or (443 if parts.scheme == "https" else 80)
+    target = parts.path or "/"
+    if parts.query:
+        target = f"{target}?{parts.query}"
+
+    connection_cls = http.client.HTTPSConnection if parts.scheme == "https" else http.client.HTTPConnection
+    connection = connection_cls(parts.hostname, port, timeout=timeout_sec)
+    try:
+        connection.request("POST", target, body=body, headers=headers)
+        response = connection.getresponse()
+        raw = response.read()
+        if response.status >= 400:
+            content = raw.decode("utf-8", errors="replace")
+            raise ConversationDriverError(f"chat call failed: status={response.status}, body={content}")
+        return json.loads(raw.decode("utf-8"))
+    finally:
+        connection.close()

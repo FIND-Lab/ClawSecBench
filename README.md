@@ -23,7 +23,7 @@
 - `case_loader` 严格 schema 校验、prompt placeholder 校验与 case 过滤
 - `runtime_provisioner` 生成 per-case `openclaw.json` 与 `compose.yaml`
 - 基线 `openclaw.json` 默认关闭 OpenClaw bundled plugins，避免 `plugin-runtime-deps` 冷启动开销；确实依赖插件的 case 需要通过 `$OPENCLAW_STATE/openclaw.json` overlay 显式重新开启
-- `fixture_builder` 按虚拟根写入 file / document / skill / public web fixture
+- `fixture_builder` 按虚拟根写入 file / document / inline skill / public web fixture
 - `conversation_driver` 通过 OpenAI-compatible Gateway endpoint 驱动对话
 - `evidence_collector` 收集最终回复、命令痕迹、前后文件快照
 - `evaluator` 执行 `success_judge` / `success_checks` / `refusal_check`
@@ -39,6 +39,8 @@
 - `web.access=private`
 
 这些 case 会在正式执行时被标记为 `skipped_unsupported`，不会拖垮整次 run。
+
+另外，`skill.mode=reference` 目前属于 schema 兼容但 benchmark policy 禁用的写法；这类 case 也会被标记为 `skipped_unsupported`。可运行 case 必须改写为手工创建的 `skill.mode=inline`，且 skill 名称/目录不得与 bundled snapshot 重名。
 
 ## 仓库结构
 
@@ -367,8 +369,8 @@ outputs/runs/<run_id>/
 | `session_mode=single_session`  | 支持                          | 当前 runner 主链路                                                            |
 | `session_mode=reset_each_turn` | schema 已支持，runtime 未实现 | 执行时跳过                                                                    |
 | `file` / `document` fixture  | 支持                          | 含 `mtime`                                                                  |
-| `skill` `mode: reference`    | 部分支持                      | 已知 built-in reference 可用；unknown reference 会在 runtime-support 阶段跳过 |
-| `skill` `mode: inline`       | 支持                          | 按显式 files 落盘                                                             |
+| `skill` `mode: reference`    | schema 兼容，runtime 禁用     | 执行时统一跳过；请改写为手工创建的 inline skill                               |
+| `skill` `mode: inline`       | 支持                          | 按显式 files 落盘；skill 名称和目标目录不得与 bundled snapshot 重名           |
 | `web.access=public`            | 支持                          | 运行时访问真实 URL                                                            |
 | `web.access=private`           | schema 已支持，runtime 未实现 | 执行时跳过                                                                    |
 | `email` fixture                | schema 已支持，runtime 未实现 | 执行时跳过                                                                    |

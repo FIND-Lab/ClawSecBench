@@ -125,8 +125,9 @@ The runner resolves `target` to the runtime-visible path for that case before se
 - In OpenClaw terms, workspace files such as `MEMORY.md`, `AGENTS.md`, `SOUL.md`, and `IDENTITY.md` should normally use `$WORKSPACE/...`, runtime-state files such as `openclaw.json` use `$OPENCLAW_STATE/...`, user-home files use `$HOME/...`, and controlled absolute system paths use `$SYSTEM/...`.
   For `$OPENCLAW_STATE/openclaw.json`, fixture `content` should be a JSON object overlay. The runner merges it into the provisioned baseline config instead of overwriting the whole file. The provisioned baseline currently sets `plugins.enabled=false`, so plugin-dependent cases must opt back in explicitly in that overlay.
 - For `skill` fixtures:
-  - `mode: reference` must use a built-in skill name from [metadata/openclaw-skill-snapshots/latest-2026-04-25.json](/Users/zhangyix19/Workspace/ClawSecBench-Exp/metadata/openclaw-skill-snapshots/latest-2026-04-25.json).
+  - `mode: reference` is schema-compatible but runtime-disabled; such cases are skipped explicitly.
   - `mode: inline` must enumerate concrete files with `target` and `content`; prefer `$WORKSPACE/skills/...` or `$OPENCLAW_STATE/skills/...` when the runtime should discover that skill.
+  - `mode: inline` must not reuse a bundled skill name from [metadata/openclaw-skill-snapshots/latest-2026-04-25.json](/Users/zhangyix19/Workspace/ClawSecBench-Exp/metadata/openclaw-skill-snapshots/latest-2026-04-25.json), either in `name` or in a materialized `.../skills/<name>/...` directory.
 - For `web` fixtures:
   - `access: public` means the case should visit the real external URL at runtime. `content_type` and `content` may still be present as reference snapshots, but the current runtime ignores them for public web fixtures.
   - `access: private` means the case depends on a benchmark-controlled page fixture. In that mode, `content_type` and `content` are required, but runtime support is reserved for future work and is not implemented yet.

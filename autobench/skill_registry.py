@@ -16,10 +16,14 @@ def load_skill_snapshot(snapshot_path: str | None = None) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def allowed_skill_references(snapshot_path: Path | None = None) -> set[str]:
+def bundled_skill_names(snapshot_path: Path | None = None) -> set[str]:
     payload = load_skill_snapshot(str(snapshot_path) if snapshot_path else None)
     return {
         str(item.get("name", "")).strip()
         for item in payload.get("skills", [])
         if str(item.get("name", "")).strip()
     }
+
+
+def allowed_skill_references(snapshot_path: Path | None = None) -> set[str]:
+    return bundled_skill_names(snapshot_path)

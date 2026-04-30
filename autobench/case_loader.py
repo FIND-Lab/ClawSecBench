@@ -9,7 +9,9 @@ from jsonschema.validators import validator_for
 
 from .case_ids import case_label, matches_case_id_filter
 from .models import CaseDefinition, SampleType
+from .path_utils import logical_path_key
 from .prompt_templates import validate_prompt_templates
+from .skill_registry import bundled_skill_names
 
 
 class CaseLoaderError(RuntimeError):
@@ -61,6 +63,7 @@ def load_cases(
         case = CaseDefinition.from_dict(raw)
         case_errors = [
             *validate_prompt_templates(case),
+            *validate_inline_skill_names(case),
         ]
         if case_errors:
             joined = "\n- ".join(case_errors)
@@ -131,3 +134,59 @@ def detect_mixed_overlap(case: CaseDefinition) -> bool:
     attack_keys = {(c.type, c.path, c.value, c.pattern) for c in case.attack.success_checks}
     benign_keys = {(c.type, c.path, c.value, c.pattern) for c in case.benign_task.success_checks}
     return bool(attack_keys.intersection(benign_keys))
+
+
+def validate_inline_skill_names(case: CaseDefinition) -> list[str]:
+    bundled_lookup = {name.casefold(): name for name in bundled_skill_names()}
+    errors: list[str] = []
+    for index, env in enumerate(case.procedure.environment):
+        if env.kind != "skill" or str(env.payload.get("mode", "")).strip() != "inline":
+            continue
+
+        declared_name = str(env.payload.get("name", "")).strip()
+        if declared_name:
+            bundled_name = bundled_lookup.get(declared_name.casefold())
+            if bundled_name is not None:
+                errors.append(
+                    f"procedure.environment[{index}]: inline skill name collides with bundled skill snapshot: "
+                    f"{declared_name}"
+                )
+
+        collided_dirs = {
+            bundled_name
+            for file_item in env.payload.get("files", [])
+            if isinstance(file_item, dict)
+            for bundled_name in [_bundled_skill_name_for_target(file_item.get("target"), bundled_lookup)]
+            if bundled_name is not None
+        }
+        for bundled_name in sorted(collided_dirs):
+            errors.append(
+                f"procedure.environment[{index}]: inline skill targets bundled skill directory: {bundled_name}"
+            )
+    return errors
+
+
+def _bundled_skill_name_for_target(target: Any, bundled_lookup: dict[str, str]) -> str | None:
+    skill_dir = _inline_skill_dir_from_target(target)
+    if skill_dir is None:
+        return None
+    return bundled_lookup.get(skill_dir.casefold())
+
+
+def _inline_skill_dir_from_target(target: Any) -> str | None:
+    target_text = str(target).strip() if target is not None else ""
+    if not target_text:
+        return None
+    try:
+        logical_target = logical_path_key(target_text)
+    except ValueError:
+        return None
+
+    parts = logical_target.split("/")
+    for index, part in enumerate(parts):
+        if part != "skills":
+            continue
+        if index + 2 >= len(parts):
+            continue
+        return parts[index + 1]
+    return None

@@ -93,8 +93,8 @@ Conversion rules:
 - Do not infer `$OPENCLAW_STATE/...` for MEMORY.md, SOUL.md, IDENTITY.md, or AGENTS.md unless the legacy case explicitly indicates a runtime-state path outside the normal agent workspace.
 - For other legacy file or document fixtures, place them under the appropriate virtual root inferred from the legacy path or base; default to `$WORKSPACE/<name>` when no stronger signal exists.
 - For legacy `skill` environments, use `kind: skill`.
-- Preserve the legacy skill name in `mode: reference` fixtures unless the case truly needs inline skill files.
-- The provided built-in skill snapshot is reference context for authoring only. Rewrite-time validation does not enforce it; actual support is decided by the benchmark runtime.
+- `mode: reference` is schema-compatible but runtime-disabled in this benchmark. Prefer case-owned `mode: inline` skill files whenever the migrated case needs a runnable skill fixture.
+- The provided built-in skill snapshot is both authoring context and a reserved-name list. Inline/manual skills must not reuse bundled snapshot names.
 - If the migrated case truly needs embedded skill files, use `mode: inline` and provide explicit `files` entries with `target` and `content`.
 - For legacy `web` environments:
   - default to `access: public` for real external URLs, even if the legacy case includes reference page content for review
@@ -535,9 +535,9 @@ def build_user_prompt(
         "- Keep any generated environment ids, especially for fixtures referenced by placeholders.",
         "- When a turn refers to an environment fixture, use {{fixture_id.field}} placeholders instead of hardcoded values.",
         "- Every file/document target must use $WORKSPACE/..., $OPENCLAW_STATE/..., $HOME/..., or $SYSTEM/....",
-        "- The provided skill snapshot is authoring context only; runtime support is validated later.",
-        "- Preserve legacy skill reference names unless you intentionally convert the case to inline skill files.",
-        "- Inline skill files must use explicit files[target, content] entries.",
+        "- The provided skill snapshot is a reserved-name list for bundled skills.",
+        "- Avoid mode: reference because this benchmark runtime skips reference-skill cases.",
+        "- Inline/manual skill files must use explicit files[target, content] entries and must not reuse bundled snapshot names.",
         "",
     ]
     return "\n".join(prompt)

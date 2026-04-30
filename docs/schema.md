@@ -209,12 +209,11 @@ Use `access: private` when the case depends on a benchmark-controlled webpage fi
 
 #### Skill Reference
 
-Use this when a case depends on a built-in OpenClaw skill that is explicitly allowed by the benchmark snapshot whitelist.
+`mode: reference` remains in schema for backward compatibility, but the current benchmark runtime intentionally does not execute such cases.
 
-The `reference` value must be one of the names listed in [metadata/openclaw-skill-snapshots/latest-2026-04-25.json](/Users/zhangyix19/Workspace/ClawSecBench-Exp/metadata/openclaw-skill-snapshots/latest-2026-04-25.json).
-The runner validates the name against that snapshot during case loading. It does not materialize files for `reference`; the case is declaring a dependency on a built-in skill that should already exist in the chosen runtime image.
+Any case that declares a `skill` fixture with `mode: reference` is marked `skipped_unsupported` during runtime filtering. The benchmark policy is to require case-owned skill files instead of mutating or depending on bundled image skills.
 
-If you later run against a different OpenClaw image version and that built-in skill is missing or changed, that case may fail at runtime. This is acceptable and is one reason benchmark runs should pin image tags or digests.
+If an older case still keeps a bundled skill name for archival reasons, leave it schema-valid here, but treat it as non-runnable until it is rewritten as an inline/manual skill fixture.
 
 ```json
 {
@@ -228,7 +227,7 @@ If you later run against a different OpenClaw image version and that built-in sk
 
 #### Inline Skill
 
-Use this when a case needs the skill files embedded directly in the case.
+Use this when a case needs the skill files embedded directly in the case. This is the only runnable skill-fixture mode in the current benchmark runtime.
 
 ```json
 {
@@ -247,6 +246,7 @@ Use this when a case needs the skill files embedded directly in the case.
 
 `inline` is fully case-owned. The runner materializes every declared file exactly as listed in `files`.
 Prefer explicit skill file targets such as `$WORKSPACE/skills/...` or `$OPENCLAW_STATE/skills/...` when the skill should be discoverable in the runtime.
+The inline skill's declared `name` and any materialized skill directory name under `.../skills/<name>/...` must not collide with the bundled snapshot names listed in [metadata/openclaw-skill-snapshots/latest-2026-04-25.json](/Users/zhangyix19/Workspace/ClawSecBench-Exp/metadata/openclaw-skill-snapshots/latest-2026-04-25.json).
 
 Supported placeholder fields:
 

@@ -281,14 +281,14 @@ class Reporter:
             "email": "邮件环境未实现",
             "private_web": "私有网页未实现",
             "reset_each_turn": "逐轮重置会话未实现",
-            "skill_reference": "技能引用当前 runtime 不可用",
+            "skill_reference": "技能引用已禁用",
         }.get(value, value)
 
     def _format_unsupported_feature(self, feature: "UnsupportedRuntimeFeature") -> str:
         if feature.code == "skill_reference":
-            prefix = "skill reference fixtures are declared in schema but not available in the current runtime: "
+            prefix = "skill reference fixtures are disabled by benchmark policy; use inline/manual skill files instead: "
             refs = feature.message[len(prefix) :] if feature.message.startswith(prefix) else feature.message
-            return f"技能引用不可用：{refs}"
+            return f"技能引用已禁用：{refs}"
         return self._unsupported_reason_label(feature.code)
 
     def _sorted_counter_items(self, counter: Counter[str]) -> list[tuple[str, int]]:
