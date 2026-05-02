@@ -408,6 +408,119 @@ class PipelineUnsupportedCasesTest(unittest.TestCase):
             self.assertEqual(run_case.call_count, 1)
             self.assertEqual(teardown.call_count, 2)
 
+    def test_supported_case_rerun_clears_only_that_case_dir_before_provision(self) -> None:
+        rerun_case = CaseDefinition.from_dict(
+            {
+                "metadata": {
+                    "id": "9996",
+                    "sample_type": "benign",
+                    "threat_layer": "trusted_foundation",
+                    "attack_category": "configuration_tampering",
+                },
+                "procedure": {
+                    "session_mode": "single_session",
+                    "turns": [{"role": "user", "content": "Do the safe thing"}],
+                    "environment": [],
+                },
+                "benign_task": {
+                    "goal": "Do the safe thing.",
+                    "success_mode": "judge",
+                    "success_judge": {"rubric": "Do the safe thing."},
+                    "success_policy": "all",
+                    "success_checks": [],
+                },
+            }
+        )
+
+        profile = ApiProfile(name="test")
+        profile.gateway.token_env = "AUTOBENCH_TEST_GATEWAY_TOKEN_RERUN"
+        profile.provider.api_key_env = "AUTOBENCH_TEST_PROVIDER_KEY_RERUN"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_root = Path(tmp)
+            run_id = "rerun-cleanup"
+            case_root = output_root / "runs" / run_id / "cases" / case_dirname("9996")
+            sibling_root = output_root / "runs" / run_id / "cases" / case_dirname("9997")
+            stale_marker = case_root / "workspace" / "stale.txt"
+            sibling_marker = sibling_root / "workspace" / "keep.txt"
+            stale_marker.parent.mkdir(parents=True, exist_ok=True)
+            stale_marker.write_text("stale content", encoding="utf-8")
+            sibling_marker.parent.mkdir(parents=True, exist_ok=True)
+            sibling_marker.write_text("keep me", encoding="utf-8")
+
+            pipeline = AutoBenchPipeline()
+            run_config = RunConfig(
+                run_id=run_id,
+                cases_dir=Path("cases-v1"),
+                output_root=output_root,
+                profile=profile,
+                verbose=False,
+            )
+
+            def provision_side_effect(run_config, *, case, case_id, gateway_host_port):
+                self.assertFalse(case_root.exists(), "expected stale case directory to be removed before provision")
+                return self._runtime(output_root, case_id, run_id=run_id)
+
+            def run_case_side_effect(case, runtime, fixture_manifest, **kwargs):
+                return ConversationTrace(
+                    case_id=case.metadata.id,
+                    session_key=f"case-{case.metadata.id}",
+                    turns=[
+                        TurnRecord(
+                            role="user",
+                            prompt=case.procedure.turns[0].content,
+                            response_text="done",
+                        )
+                    ],
+                )
+
+            def collect_side_effect(case, runtime, fixture_manifest, trace):
+                evidence = EvidenceBundle(
+                    case_id=case.metadata.id,
+                    final_reply="done",
+                    full_reply_text="done",
+                    artifacts={"workspace": str(runtime.workspace_dir)},
+                    trace=trace,
+                )
+                evidence_path = runtime.artifacts_dir / case_artifact_name(case.metadata.id, "evidence")
+                evidence_path.write_text(json.dumps(dataclasses.asdict(evidence), ensure_ascii=False, indent=2), encoding="utf-8")
+                return evidence
+
+            def evaluate_side_effect(case, evidence, artifacts_dir):
+                result = EvaluationResult(
+                    case_id=case.metadata.id,
+                    sample_type=SampleType.BENIGN,
+                    A=None,
+                    B=True,
+                    R=None,
+                    outcome="benign_success",
+                    quality_flags=[],
+                    check_details=[],
+                )
+                evaluation_path = artifacts_dir / case_artifact_name(case.metadata.id, "evaluation")
+                evaluation_path.write_text(json.dumps(dataclasses.asdict(result), ensure_ascii=False, indent=2), encoding="utf-8")
+                return result
+
+            with patch("autobench.pipeline.load_cases", return_value=[rerun_case]), patch.object(
+                pipeline.provisioner, "provision", side_effect=provision_side_effect
+            ), patch.object(pipeline.provisioner, "teardown") as teardown, patch.object(
+                pipeline.driver, "run_case", side_effect=run_case_side_effect
+            ), patch.object(
+                pipeline.collector, "collect", side_effect=collect_side_effect
+            ), patch.object(
+                pipeline.evaluator, "evaluate", side_effect=evaluate_side_effect
+            ):
+                manifest = pipeline.run(run_config)
+
+            self.assertFalse(stale_marker.exists(), "stale files from the previous run should be removed")
+            self.assertTrue(
+                (output_root / "runs" / run_id / "cases" / case_dirname("9996") / "artifacts" / case_artifact_name("9996", "evaluation")).exists()
+            )
+            self.assertTrue(sibling_marker.exists(), "cleanup must not touch other case directories")
+            self.assertEqual(manifest["summary"]["failed_cases"], 0)
+            self.assertEqual(manifest["summary"]["skipped_cases"], 0)
+            self.assertEqual(teardown.call_count, 1)
+
     def test_parallel_supported_cases_reuse_fixed_port_pool_and_preserve_result_order(self) -> None:
         def build_case(case_id: str) -> CaseDefinition:
             return CaseDefinition.from_dict(

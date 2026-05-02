@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
+import shutil
 import os
 from queue import Queue
 import secrets
@@ -146,6 +147,7 @@ class AutoBenchPipeline:
         runtime = None
         stage = "provision"
         try:
+            self._reset_case_run_dir(run_dir, case.metadata.id)
             runtime = self.provisioner.provision(
                 run_config,
                 case=case,
@@ -273,12 +275,18 @@ class AutoBenchPipeline:
         manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
         return manifest
 
+    def _reset_case_run_dir(self, run_dir, case_id: str) -> None:
+        case_dir = run_dir / "cases" / case_dirname(case_id)
+        if case_dir.exists():
+            shutil.rmtree(case_dir)
+
     def _build_unsupported_case_result(
         self,
         case,
         run_dir,
         unsupported_features: list[UnsupportedRuntimeFeature],
     ) -> CaseRunResult:
+        self._reset_case_run_dir(run_dir, case.metadata.id)
         case_dir = run_dir / "cases" / case_dirname(case.metadata.id)
         artifacts_dir = case_dir / "artifacts"
         artifacts_dir.mkdir(parents=True, exist_ok=True)

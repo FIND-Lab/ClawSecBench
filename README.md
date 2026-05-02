@@ -361,6 +361,10 @@ outputs/runs/<run_id>/
 - `--dry` 不会写这些执行产物；只会生成 `run_manifest.json` 和 `case.md`
 - `--report-only` 会重建 `summary.json` 和 `report.md`
 - `CaseRunResult.executed=false` 的 case 会在 summary 中统计为 `skipped_cases`
+- 同一个 `run_id` 下重复重跑某个 `case_id` 时，runner 会先清理
+  `outputs/runs/<run_id>/cases/case-<id>/`，只重建该 case 的目录内容；
+  其他 case 目录和 run 级文件会保留不动，因此可以在补跑后再执行
+  `--report-only --run-id <run_id>` 重新汇总整批结果
 
 ## 支持矩阵
 
