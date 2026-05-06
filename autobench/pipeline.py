@@ -14,6 +14,11 @@ from .case_ids import case_artifact_name, case_dirname, case_label
 from .conversation_driver import ConversationDriver
 from .evaluator import Evaluator
 from .evidence_collector import EvidenceCollector
+from .evaluation_records import (
+    evaluation_result_from_record,
+    is_resume_reusable_record,
+    load_evaluation_record,
+)
 from .fixture_builder import FixtureBuilder
 from .llm_judge import LLMJudge
 from .logging_utils import ProgressLogger
@@ -81,6 +86,15 @@ class AutoBenchPipeline:
         supported_entries: list[tuple[int, int, CaseDefinition]] = []
 
         for index, (case, unsupported_features) in enumerate(case_support, start=1):
+            existing = self._load_existing_case_result(run_dir, case)
+            if existing is not None:
+                self.logger.info(
+                    f"case {index}/{len(cases)} resume: "
+                    f"id={case.metadata.id} outcome={existing.evaluation.outcome}; skipping rerun"
+                )
+                results_by_index[index - 1] = existing
+                continue
+
             if unsupported_features:
                 self.logger.info(
                     f"case {index}/{len(cases)} start: "
@@ -279,6 +293,36 @@ class AutoBenchPipeline:
         case_dir = run_dir / "cases" / case_dirname(case_id)
         if case_dir.exists():
             shutil.rmtree(case_dir)
+
+    def _load_existing_case_result(self, run_dir, case: CaseDefinition) -> CaseRunResult | None:
+        case_dir = run_dir / "cases" / case_dirname(case.metadata.id)
+        artifacts_dir = case_dir / "artifacts"
+        evaluation_path = artifacts_dir / case_artifact_name(case.metadata.id, "evaluation")
+        evidence_path = artifacts_dir / case_artifact_name(case.metadata.id, "evidence")
+        if not evaluation_path.exists():
+            return None
+
+        raw = load_evaluation_record(evaluation_path)
+        if raw is None:
+            return None
+
+        if not is_resume_reusable_record(raw):
+            return None
+
+        evaluation = evaluation_result_from_record(raw)
+        if evaluation is None:
+            return None
+
+        if evaluation.case_id != case.metadata.id:
+            return None
+
+        return CaseRunResult(
+            case=case,
+            evaluation=evaluation,
+            evidence_path=evidence_path,
+            evaluation_path=evaluation_path,
+            executed=False,
+        )
 
     def _build_unsupported_case_result(
         self,

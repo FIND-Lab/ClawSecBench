@@ -521,6 +521,200 @@ class PipelineUnsupportedCasesTest(unittest.TestCase):
             self.assertEqual(manifest["summary"]["skipped_cases"], 0)
             self.assertEqual(teardown.call_count, 1)
 
+    def test_supported_case_with_existing_success_evaluation_skips_rerun(self) -> None:
+        case = CaseDefinition.from_dict(
+            {
+                "metadata": {
+                    "id": "9998",
+                    "sample_type": "benign",
+                    "threat_layer": "trusted_foundation",
+                    "attack_category": "configuration_tampering",
+                },
+                "procedure": {
+                    "session_mode": "single_session",
+                    "turns": [{"role": "user", "content": "Do the safe thing"}],
+                    "environment": [],
+                },
+                "benign_task": {
+                    "goal": "Do the safe thing.",
+                    "success_mode": "judge",
+                    "success_judge": {"rubric": "Do the safe thing."},
+                    "success_policy": "all",
+                    "success_checks": [],
+                },
+            }
+        )
+
+        profile = ApiProfile(name="test")
+        profile.gateway.token_env = "AUTOBENCH_TEST_GATEWAY_TOKEN_RESUME_OK"
+        profile.provider.api_key_env = "AUTOBENCH_TEST_PROVIDER_KEY_RESUME_OK"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_root = Path(tmp)
+            run_id = "resume-success"
+            artifacts_dir = output_root / "runs" / run_id / "cases" / case_dirname("9998") / "artifacts"
+            artifacts_dir.mkdir(parents=True, exist_ok=True)
+            existing_eval = EvaluationResult(
+                case_id="9998",
+                sample_type=SampleType.BENIGN,
+                A=None,
+                B=True,
+                R=None,
+                outcome="benign_success",
+                quality_flags=["existing_result"],
+                check_details=[{"block": "benign_task"}],
+            )
+            eval_path = artifacts_dir / case_artifact_name("9998", "evaluation")
+            eval_path.write_text(json.dumps(dataclasses.asdict(existing_eval), ensure_ascii=False, indent=2), encoding="utf-8")
+            evidence_path = artifacts_dir / case_artifact_name("9998", "evidence")
+            evidence_path.write_text(json.dumps({"case_id": "9998", "status": "ok"}, ensure_ascii=False, indent=2), encoding="utf-8")
+
+            pipeline = AutoBenchPipeline()
+            run_config = RunConfig(
+                run_id=run_id,
+                cases_dir=Path("cases-v1"),
+                output_root=output_root,
+                profile=profile,
+                verbose=False,
+            )
+
+            with patch("autobench.pipeline.load_cases", return_value=[case]), patch.object(
+                pipeline.provisioner, "provision"
+            ) as provision, patch.object(
+                pipeline.driver, "run_case"
+            ) as run_case, patch.object(
+                pipeline.fixture_builder, "build"
+            ) as build, patch("autobench.pipeline.LLMJudge.from_profile", return_value=None):
+                manifest = pipeline.run(run_config)
+
+            self.assertEqual(provision.call_count, 0)
+            self.assertEqual(build.call_count, 0)
+            self.assertEqual(run_case.call_count, 0)
+            self.assertEqual(manifest["summary"]["finished_cases"], 1)
+            self.assertEqual(manifest["summary"]["failed_cases"], 0)
+            self.assertEqual(manifest["summary"]["outcome_counts"], {"benign_success": 1})
+            self.assertTrue(eval_path.exists())
+            self.assertTrue(evidence_path.exists())
+
+    def test_supported_case_with_existing_runtime_error_evaluation_reruns(self) -> None:
+        case = CaseDefinition.from_dict(
+            {
+                "metadata": {
+                    "id": "9999",
+                    "sample_type": "benign",
+                    "threat_layer": "trusted_foundation",
+                    "attack_category": "configuration_tampering",
+                },
+                "procedure": {
+                    "session_mode": "single_session",
+                    "turns": [{"role": "user", "content": "Do the safe thing"}],
+                    "environment": [],
+                },
+                "benign_task": {
+                    "goal": "Do the safe thing.",
+                    "success_mode": "judge",
+                    "success_judge": {"rubric": "Do the safe thing."},
+                    "success_policy": "all",
+                    "success_checks": [],
+                },
+            }
+        )
+
+        profile = ApiProfile(name="test")
+        profile.gateway.token_env = "AUTOBENCH_TEST_GATEWAY_TOKEN_RESUME_FAIL"
+        profile.provider.api_key_env = "AUTOBENCH_TEST_PROVIDER_KEY_RESUME_FAIL"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_root = Path(tmp)
+            run_id = "resume-runtime-error"
+            case_root = output_root / "runs" / run_id / "cases" / case_dirname("9999")
+            artifacts_dir = case_root / "artifacts"
+            workspace_dir = case_root / "workspace"
+            artifacts_dir.mkdir(parents=True, exist_ok=True)
+            workspace_dir.mkdir(parents=True, exist_ok=True)
+            stale_marker = workspace_dir / "stale.txt"
+            stale_marker.write_text("old-runtime-error", encoding="utf-8")
+            runtime_error_eval = EvaluationResult(
+                case_id="9999",
+                sample_type=SampleType.BENIGN,
+                A=None,
+                B=None,
+                R=None,
+                outcome="runtime_error",
+                quality_flags=["runtime_error"],
+                check_details=[{"block": "runtime.error", "stage": "conversation"}],
+            )
+            eval_path = artifacts_dir / case_artifact_name("9999", "evaluation")
+            eval_path.write_text(
+                json.dumps(dataclasses.asdict(runtime_error_eval), ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+
+            pipeline = AutoBenchPipeline()
+            run_config = RunConfig(
+                run_id=run_id,
+                cases_dir=Path("cases-v1"),
+                output_root=output_root,
+                profile=profile,
+                verbose=False,
+            )
+
+            def provision_side_effect(run_config, *, case, case_id, gateway_host_port):
+                self.assertFalse(case_root.exists(), "expected runtime_error case directory to be removed before rerun provision")
+                return self._runtime(output_root, case_id, run_id=run_id)
+
+            def run_case_side_effect(case, runtime, fixture_manifest, **kwargs):
+                return ConversationTrace(
+                    case_id=case.metadata.id,
+                    session_key=f"case-{case.metadata.id}",
+                    turns=[TurnRecord(role="user", prompt=case.procedure.turns[0].content, response_text="done")],
+                )
+
+            def collect_side_effect(case, runtime, fixture_manifest, trace):
+                evidence = EvidenceBundle(
+                    case_id=case.metadata.id,
+                    final_reply="done",
+                    full_reply_text="done",
+                    artifacts={"workspace": str(runtime.workspace_dir)},
+                    trace=trace,
+                )
+                evidence_path = runtime.artifacts_dir / case_artifact_name(case.metadata.id, "evidence")
+                evidence_path.write_text(json.dumps(dataclasses.asdict(evidence), ensure_ascii=False, indent=2), encoding="utf-8")
+                return evidence
+
+            def evaluate_side_effect(case, evidence, artifacts_dir):
+                result = EvaluationResult(
+                    case_id=case.metadata.id,
+                    sample_type=SampleType.BENIGN,
+                    A=None,
+                    B=True,
+                    R=None,
+                    outcome="benign_success",
+                    quality_flags=[],
+                    check_details=[],
+                )
+                evaluation_path = artifacts_dir / case_artifact_name(case.metadata.id, "evaluation")
+                evaluation_path.write_text(json.dumps(dataclasses.asdict(result), ensure_ascii=False, indent=2), encoding="utf-8")
+                return result
+
+            with patch("autobench.pipeline.load_cases", return_value=[case]), patch.object(
+                pipeline.provisioner, "provision", side_effect=provision_side_effect
+            ) as provision, patch.object(pipeline.provisioner, "teardown"), patch.object(
+                pipeline.driver, "run_case", side_effect=run_case_side_effect
+            ), patch.object(
+                pipeline.collector, "collect", side_effect=collect_side_effect
+            ), patch.object(
+                pipeline.evaluator, "evaluate", side_effect=evaluate_side_effect
+            ), patch("autobench.pipeline.LLMJudge.from_profile", return_value=None):
+                manifest = pipeline.run(run_config)
+
+            self.assertEqual(provision.call_count, 1)
+            self.assertFalse(stale_marker.exists(), "runtime_error artifacts should be cleaned before rerun")
+            rerun_eval = json.loads(eval_path.read_text(encoding="utf-8"))
+            self.assertEqual(rerun_eval["outcome"], "benign_success")
+            self.assertEqual(manifest["summary"]["failed_cases"], 0)
+            self.assertEqual(manifest["summary"]["finished_cases"], 1)
+
     def test_parallel_supported_cases_reuse_fixed_port_pool_and_preserve_result_order(self) -> None:
         def build_case(case_id: str) -> CaseDefinition:
             return CaseDefinition.from_dict(

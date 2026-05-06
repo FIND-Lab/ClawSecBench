@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .case_ids import coerce_case_id
+from .evaluation_records import is_failed_record, is_skipped_record, load_evaluation_record
 from .models import CaseRunResult, RunSummary
 
 if TYPE_CHECKING:
@@ -22,8 +23,8 @@ class Reporter:
             reason for item in results if not item.executed for reason in item.evaluation.skip_reasons
         )
         records = [asdict(item.evaluation) for item in results]
-        skipped_cases = sum(1 for record in records if self._is_skipped_record(record))
-        failed_cases = sum(1 for record in records if self._is_failed_record(record))
+        skipped_cases = sum(1 for record in records if is_skipped_record(record))
+        failed_cases = sum(1 for record in records if is_failed_record(record))
 
         summary = RunSummary(
             run_id=run_id,
@@ -48,7 +49,11 @@ class Reporter:
         evaluation_paths = sorted(output_dir.glob("cases/case-*/artifacts/case-*-evaluation.json"))
         if not evaluation_paths:
             raise FileNotFoundError(f"no evaluation artifacts found under {output_dir}")
-        records = [json.loads(path.read_text(encoding="utf-8")) for path in evaluation_paths]
+        records: list[dict] = []
+        for path in evaluation_paths:
+            record = load_evaluation_record(path)
+            if record is not None:
+                records.append(record)
 
         by_sample_type = Counter(str(record["sample_type"]) for record in records)
         outcome_counts = Counter(str(record["outcome"]) for record in records)
@@ -62,10 +67,10 @@ class Reporter:
             run_id=run_id,
             total_cases=len(records),
             finished_cases=sum(
-                1 for record in records if not self._is_skipped_record(record) and not self._is_failed_record(record)
+                1 for record in records if not is_skipped_record(record) and not is_failed_record(record)
             ),
-            failed_cases=sum(1 for record in records if self._is_failed_record(record)),
-            skipped_cases=sum(1 for record in records if self._is_skipped_record(record)),
+            failed_cases=sum(1 for record in records if is_failed_record(record)),
+            skipped_cases=sum(1 for record in records if is_skipped_record(record)),
             by_sample_type=dict(by_sample_type),
             outcome_counts=dict(outcome_counts),
             skip_reason_counts=dict(skip_reason_counts),
@@ -128,7 +133,7 @@ class Reporter:
 
         failed_rows = []
         for record in self._load_report_records(summary):
-            if not self._is_failed_record(record):
+            if not is_failed_record(record):
                 continue
             failed_rows.append(self._failure_row(record))
         if failed_rows:
@@ -306,24 +311,16 @@ class Reporter:
             lines.append("| " + " | ".join(sanitized) + " |")
         return lines
 
-    def _is_skipped_record(self, record: dict) -> bool:
-        if record.get("skip_reasons"):
-            return True
-        return str(record.get("outcome")) in {"skipped_unsupported", "dry_run"}
-
-    def _is_failed_record(self, record: dict) -> bool:
-        return str(record.get("outcome")) == "runtime_error"
-
     def _load_report_records(self, summary: RunSummary) -> list[dict]:
         records: list[dict] = []
         for path_text in summary.result_paths:
             path = Path(path_text)
             if not path.exists():
                 continue
-            try:
-                records.append(json.loads(path.read_text(encoding="utf-8")))
-            except (OSError, json.JSONDecodeError):
+            record = load_evaluation_record(path)
+            if record is None:
                 continue
+            records.append(record)
         return records
 
     def _failure_row(self, record: dict) -> tuple[str, str, str, str, str]:
