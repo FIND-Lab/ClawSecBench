@@ -76,6 +76,7 @@ class Evaluator:
         error_type: str,
         message: str,
         traceback_text: str | None = None,
+        extra_detail: dict[str, Any] | None = None,
     ) -> EvaluationResult:
         detail: dict[str, Any] = {
             "block": "runtime.error",
@@ -86,6 +87,8 @@ class Evaluator:
         }
         if traceback_text:
             detail["traceback"] = traceback_text
+        if extra_detail:
+            detail.update(extra_detail)
         return EvaluationResult(
             case_id=case.metadata.id,
             sample_type=case.metadata.sample_type,

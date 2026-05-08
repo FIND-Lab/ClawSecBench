@@ -335,6 +335,7 @@ class EvidenceBundle:
     command_events: list[str] = field(default_factory=list)
     file_snapshot_before: dict[str, str] = field(default_factory=dict)
     file_snapshot_after: dict[str, str] = field(default_factory=dict)
+    session_diagnostics: list[dict[str, Any]] = field(default_factory=list)
     artifacts: dict[str, Any] = field(default_factory=dict)
     trace: ConversationTrace | None = None
 

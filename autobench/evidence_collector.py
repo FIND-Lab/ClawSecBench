@@ -14,6 +14,7 @@ from .models import CaseDefinition, EvidenceBundle, RuntimeHandle
 class EvidenceCollector:
     COMMAND_HINT_RE = re.compile(r"\b(curl|bash|sh|python|node|rm|chmod|env|printenv|cat)\b", re.IGNORECASE)
     STRUCTURED_EVENT_SUFFIXES = {".json", ".jsonl", ".ndjson"}
+    SESSION_TRAJECTORY_GLOB = "*.trajectory.jsonl"
     COMMAND_KEYS = {
         "argv",
         "cmd",
@@ -35,6 +36,7 @@ class EvidenceCollector:
         full_reply = "\n\n".join(turn.response_text for turn in trace.turns)
 
         command_events = self._collect_command_events(runtime, trace)
+        session_diagnostics = self._collect_session_diagnostics(runtime, trace)
 
         case_workspace = Path(fixture_manifest["case_workspace"])
         tracked_paths = {
@@ -52,6 +54,7 @@ class EvidenceCollector:
             command_events=command_events,
             file_snapshot_before=snapshot_before,
             file_snapshot_after=snapshot_after,
+            session_diagnostics=session_diagnostics,
             artifacts={
                 "trace_file": str(runtime.artifacts_dir / case_artifact_name(case.metadata.id, "trace")),
                 "workspace": str(case_workspace),
@@ -75,6 +78,122 @@ class EvidenceCollector:
         events.extend(self._collect_log_line_command_events(runtime.logs_dir))
 
         return _dedupe(events)
+
+    def _collect_session_diagnostics(self, runtime: RuntimeHandle, trace: Any | None = None) -> list[dict[str, Any]]:
+        session_key = getattr(trace, "session_key", None)
+        if not session_key:
+            return []
+
+        sessions_dir = runtime.state_dir / "agents" / "main" / "sessions"
+        if not sessions_dir.exists():
+            return []
+
+        diagnostics: list[dict[str, Any]] = []
+        for path in sorted(sessions_dir.rglob(self.SESSION_TRAJECTORY_GLOB)):
+            diagnostic = self._parse_session_trajectory(path, session_key=session_key)
+            if diagnostic is not None:
+                diagnostics.append(diagnostic)
+        return diagnostics
+
+    def _parse_session_trajectory(self, path: Path, *, session_key: str) -> dict[str, Any] | None:
+        try:
+            lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        except OSError:
+            return None
+
+        diagnostic: dict[str, Any] = {
+            "session_key": session_key,
+            "trajectory_file": str(path),
+            "session_id": None,
+            "final_status": None,
+            "session_status": None,
+            "timed_out": False,
+            "idle_timed_out": False,
+            "timed_out_during_compaction": False,
+            "external_abort": False,
+            "aborted": False,
+            "prompt_error": None,
+            "prompt_error_source": None,
+            "assistant_texts_count": 0,
+        }
+        matched = False
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if payload.get("traceSchema") != "openclaw-trajectory":
+                continue
+            if payload.get("sessionKey") != session_key:
+                continue
+
+            matched = True
+            diagnostic["session_id"] = payload.get("sessionId") or diagnostic["session_id"]
+            data = payload.get("data", {})
+            event_type = payload.get("type")
+
+            if event_type == "model.completed":
+                diagnostic["aborted"] = bool(data.get("aborted")) or diagnostic["aborted"]
+                diagnostic["external_abort"] = bool(data.get("externalAbort")) or diagnostic["external_abort"]
+                diagnostic["timed_out"] = bool(data.get("timedOut")) or diagnostic["timed_out"]
+                diagnostic["idle_timed_out"] = bool(data.get("idleTimedOut")) or diagnostic["idle_timed_out"]
+                diagnostic["timed_out_during_compaction"] = bool(
+                    data.get("timedOutDuringCompaction")
+                ) or diagnostic["timed_out_during_compaction"]
+                diagnostic["prompt_error"] = data.get("promptError") or diagnostic["prompt_error"]
+                diagnostic["prompt_error_source"] = data.get("promptErrorSource") or diagnostic["prompt_error_source"]
+                assistant_texts = data.get("assistantTexts")
+                if isinstance(assistant_texts, list):
+                    diagnostic["assistant_texts_count"] = max(
+                        diagnostic["assistant_texts_count"],
+                        len(assistant_texts),
+                    )
+            elif event_type == "trace.artifacts":
+                diagnostic["final_status"] = data.get("finalStatus") or diagnostic["final_status"]
+                diagnostic["aborted"] = bool(data.get("aborted")) or diagnostic["aborted"]
+                diagnostic["external_abort"] = bool(data.get("externalAbort")) or diagnostic["external_abort"]
+                diagnostic["timed_out"] = bool(data.get("timedOut")) or diagnostic["timed_out"]
+                diagnostic["idle_timed_out"] = bool(data.get("idleTimedOut")) or diagnostic["idle_timed_out"]
+                diagnostic["timed_out_during_compaction"] = bool(
+                    data.get("timedOutDuringCompaction")
+                ) or diagnostic["timed_out_during_compaction"]
+                diagnostic["prompt_error"] = data.get("promptError") or diagnostic["prompt_error"]
+                diagnostic["prompt_error_source"] = data.get("promptErrorSource") or diagnostic["prompt_error_source"]
+                assistant_texts = data.get("assistantTexts")
+                if isinstance(assistant_texts, list):
+                    diagnostic["assistant_texts_count"] = max(
+                        diagnostic["assistant_texts_count"],
+                        len(assistant_texts),
+                    )
+            elif event_type == "session.ended":
+                diagnostic["session_status"] = data.get("status") or diagnostic["session_status"]
+                diagnostic["aborted"] = bool(data.get("aborted")) or diagnostic["aborted"]
+                diagnostic["external_abort"] = bool(data.get("externalAbort")) or diagnostic["external_abort"]
+                diagnostic["timed_out"] = bool(data.get("timedOut")) or diagnostic["timed_out"]
+                diagnostic["idle_timed_out"] = bool(data.get("idleTimedOut")) or diagnostic["idle_timed_out"]
+                diagnostic["timed_out_during_compaction"] = bool(
+                    data.get("timedOutDuringCompaction")
+                ) or diagnostic["timed_out_during_compaction"]
+                diagnostic["prompt_error"] = data.get("promptError") or diagnostic["prompt_error"]
+                diagnostic["prompt_error_source"] = data.get("promptErrorSource") or diagnostic["prompt_error_source"]
+
+        if not matched:
+            return None
+
+        diagnostic["error"] = any(
+            (
+                diagnostic["final_status"] == "error",
+                diagnostic["session_status"] == "error",
+                diagnostic["timed_out"],
+                diagnostic["idle_timed_out"],
+                bool(diagnostic["prompt_error"]),
+            )
+        )
+        return diagnostic
 
     def _collect_trace_command_events(self, trace: Any | None) -> list[str]:
         events: list[str] = []

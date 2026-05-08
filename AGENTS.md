@@ -55,7 +55,7 @@ Chosen runtime mode:
 
 5) Evidence Collector
 - File: autobench/evidence_collector.py
-- Responsibility: collect final reply, structured command events plus log hints, file snapshots before/after.
+- Responsibility: collect final reply, OpenClaw session diagnostics from trajectory artifacts, structured command events plus log hints, file snapshots before/after.
 
 6) Evaluator
 - File: autobench/evaluator.py

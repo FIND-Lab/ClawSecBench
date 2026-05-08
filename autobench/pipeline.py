@@ -178,6 +178,14 @@ class AutoBenchPipeline:
             )
             stage = "evidence_collect"
             evidence = self.collector.collect(case, runtime, fixture_manifest, trace)
+            session_error = self._extract_session_error_detail(evidence)
+            if session_error is not None:
+                result = self._build_session_error_case_result(case, runtime, evidence, session_error)
+                self.logger.info(
+                    f"{case_label(case.metadata.id)} failed: "
+                    f"stage=conversation_session error=OpenClawSessionError: {session_error.get('message')}"
+                )
+                return result
             stage = "evaluate"
             evaluation = self.evaluator.evaluate(case, evidence, runtime.artifacts_dir)
 
@@ -371,6 +379,67 @@ class AutoBenchPipeline:
         evaluation_path = artifacts_dir / case_artifact_name(case.metadata.id, "evaluation")
         evaluation_path.write_text(json.dumps(asdict(evaluation), ensure_ascii=False, indent=2), encoding="utf-8")
 
+        return CaseRunResult(
+            case=case,
+            evaluation=evaluation,
+            evidence_path=evidence_path,
+            evaluation_path=evaluation_path,
+            executed=False,
+        )
+
+    def _extract_session_error_detail(self, evidence) -> dict | None:
+        diagnostics = getattr(evidence, "session_diagnostics", None)
+        if not isinstance(diagnostics, list):
+            return None
+        for item in diagnostics:
+            if isinstance(item, dict) and item.get("error"):
+                detail = dict(item)
+                message_parts = []
+                if detail.get("final_status"):
+                    message_parts.append(f"final_status={detail['final_status']}")
+                if detail.get("session_status"):
+                    message_parts.append(f"session_status={detail['session_status']}")
+                if detail.get("timed_out"):
+                    message_parts.append("timed_out=true")
+                if detail.get("idle_timed_out"):
+                    message_parts.append("idle_timed_out=true")
+                if detail.get("prompt_error"):
+                    message_parts.append(f"prompt_error={detail['prompt_error']}")
+                detail["message"] = "; ".join(message_parts) or "OpenClaw session ended with an execution-layer error"
+                return detail
+        return None
+
+    def _build_session_error_case_result(self, case, runtime, evidence, session_error: dict) -> CaseRunResult:
+        artifacts_dir = runtime.artifacts_dir
+        evaluation = self.evaluator.runtime_error(
+            case,
+            stage="conversation_session",
+            error_type="OpenClawSessionError",
+            message=str(session_error["message"]),
+            extra_detail={
+                key: value
+                for key, value in session_error.items()
+                if key
+                in {
+                    "session_id",
+                    "session_key",
+                    "trajectory_file",
+                    "final_status",
+                    "session_status",
+                    "timed_out",
+                    "idle_timed_out",
+                    "timed_out_during_compaction",
+                    "external_abort",
+                    "aborted",
+                    "prompt_error",
+                    "prompt_error_source",
+                    "assistant_texts_count",
+                }
+            },
+        )
+        evaluation_path = artifacts_dir / case_artifact_name(case.metadata.id, "evaluation")
+        evaluation_path.write_text(json.dumps(asdict(evaluation), ensure_ascii=False, indent=2), encoding="utf-8")
+        evidence_path = artifacts_dir / case_artifact_name(case.metadata.id, "evidence")
         return CaseRunResult(
             case=case,
             evaluation=evaluation,
