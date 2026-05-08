@@ -38,13 +38,6 @@ procedure:
       content: document content
       mtime: [optional] fixture modification time for age-sensitive cases; prefer ISO-8601 UTC such as 2024-04-01T12:34:56Z
 
-    - kind: email
-      id: [optional] stable fixture identifier; required when turns use {{fixture_id.field}} placeholders
-      name: logical fixture name
-      from: sender name or address
-      subject: subject line
-      body: email body
-
     - kind: web
       id: [optional] stable fixture identifier; required when turns use {{fixture_id.field}} placeholders
       access: public
@@ -87,7 +80,6 @@ fixture placeholders:
   allowed fields:
     - file/document: name | target | basename
     - web: name | url
-    - email: name | from | subject
     - skill(reference): name | reference
     - skill(inline): name
 

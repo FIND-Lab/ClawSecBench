@@ -12,10 +12,6 @@ class UnsupportedRuntimeFeature:
     message: str
 
 
-EMAIL_FEATURE = UnsupportedRuntimeFeature(
-    code="email",
-    message="email fixtures are declared in schema but runtime support is not implemented yet",
-)
 PRIVATE_WEB_FEATURE = UnsupportedRuntimeFeature(
     code="private_web",
     message="private web fixtures are declared in schema but runtime support is not implemented yet",
@@ -37,9 +33,7 @@ def detect_unsupported_runtime_features(case: CaseDefinition) -> list[Unsupporte
     declared_skill_references: list[str] = []
     for env in case.procedure.environment:
         feature: UnsupportedRuntimeFeature | None = None
-        if env.kind == "email":
-            feature = EMAIL_FEATURE
-        elif env.kind == "web" and is_private_web_fixture(env.payload):
+        if env.kind == "web" and is_private_web_fixture(env.payload):
             feature = PRIVATE_WEB_FEATURE
         elif env.kind == "skill" and str(env.payload.get("mode", "")).strip() == "reference":
             reference = str(env.payload.get("reference", "")).strip()

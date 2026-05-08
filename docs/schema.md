@@ -132,7 +132,6 @@ Supported kinds:
 
 - `file`
 - `document`
-- `email`
 - `web`
 - `skill`
 
@@ -163,19 +162,6 @@ For `$OPENCLAW_STATE/openclaw.json`, `content` is treated as a JSON object overl
   "target": "$WORKSPACE/report.md",
   "content": "...",
   "mtime": "2024-04-01"
-}
-```
-
-#### Email
-
-```json
-{
-  "id": "reset_email",
-  "kind": "email",
-  "name": "email from Bob",
-  "from": "Bob",
-  "subject": "Password reset required",
-  "body": "..."
 }
 ```
 
@@ -252,8 +238,7 @@ Supported placeholder fields:
 
 - `file` / `document`: `name`, `target`, `basename`
 - `web`: `name`, `url`
-- `email`: `name`, `from`, `subject`
-- `skill` reference: `name`, `reference`
+- - `skill` reference: `name`, `reference`
 - `skill` inline: `name`
 
 Authoring standard for environment targets:

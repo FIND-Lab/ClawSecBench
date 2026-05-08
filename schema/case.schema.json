@@ -249,9 +249,6 @@
           "$ref": "#/$defs/documentEnvironment"
         },
         {
-          "$ref": "#/$defs/emailEnvironment"
-        },
-        {
           "$ref": "#/$defs/webPublicEnvironment"
         },
         {
@@ -324,38 +321,6 @@
         },
         "mtime": {
           "$ref": "#/$defs/fixtureTimestamp"
-        }
-      }
-    },
-    "emailEnvironment": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "kind",
-        "name",
-        "from",
-        "subject",
-        "body"
-      ],
-      "properties": {
-        "id": {
-          "$ref": "#/$defs/fixtureId"
-        },
-        "kind": {
-          "type": "string",
-          "const": "email"
-        },
-        "name": {
-          "$ref": "#/$defs/nonEmptyString"
-        },
-        "from": {
-          "$ref": "#/$defs/nonEmptyString"
-        },
-        "subject": {
-          "$ref": "#/$defs/nonEmptyString"
-        },
-        "body": {
-          "type": "string"
         }
       }
     },

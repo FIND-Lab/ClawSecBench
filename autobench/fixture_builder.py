@@ -21,7 +21,6 @@ class FixtureBuilder:
         case_workspace.mkdir(parents=True, exist_ok=True)
 
         web_root = case_workspace / "web-fixtures"
-        inbox_root = case_workspace / "email-fixtures"
         skill_root = case_workspace / "skills"
 
         created_paths: list[str] = []
@@ -34,7 +33,6 @@ class FixtureBuilder:
                 runtime.home_dir,
                 runtime.system_dir,
                 web_root,
-                inbox_root,
                 skill_root,
             )
             created_paths.extend(created)
@@ -60,7 +58,6 @@ class FixtureBuilder:
             "tracked_paths": tracked_paths,
             "snapshot_before": snapshot_before,
             "web_root": web_root,
-            "inbox_root": inbox_root,
             "skill_root": skill_root,
         }
 
@@ -107,7 +104,6 @@ class FixtureBuilder:
         home_dir: Path,
         system_dir: Path,
         web_root: Path,
-        inbox_root: Path,
         skill_root: Path,
     ) -> tuple[list[str], dict[str, str]]:
         kind = item.kind
@@ -131,13 +127,6 @@ class FixtureBuilder:
             if is_private_web_fixture(payload):
                 raise ValueError("private web fixtures are declared in schema but runtime support is not implemented yet")
             raise ValueError(f"web fixture has unsupported access mode: {access!r}")
-
-        if kind == "email":
-            mail_file = inbox_root / "inbox.jsonl"
-            mail_file.parent.mkdir(parents=True, exist_ok=True)
-            with mail_file.open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
-            return [mail_file.as_posix()], {}
 
         if kind == "skill":
             mode = str(payload.get("mode", "")).strip()

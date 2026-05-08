@@ -2,7 +2,7 @@
 
 这个仓库当前不只是数据集本身，而是一套面向 ClawSecBench 的 OpenClaw 自动化评测框架，包含：
 
-- `cases-v1/` 中 150 条核心 schema case（`0001`-`0150`）
+- `cases-v1/` 中 143 条核心 schema case（已移除邮箱相关 case）
 - `cases-v2/` 中 7 条扩展 schema case（`1001`-`1005`、`1051`-`1052`）
 - 基于官方 OpenClaw Docker Gateway 的执行与评测流水线
 - 旧格式 `benchmark_data.json` 到 v2 schema 的重写脚本
@@ -35,7 +35,7 @@
 当前 schema 已声明但 runtime 还未实现的能力：
 
 - `session_mode=reset_each_turn`
-- `email`
+- 邮件
 - `web.access=private`
 
 这些 case 会在正式执行时被标记为 `skipped_unsupported`，不会拖垮整次 run。
@@ -46,7 +46,7 @@
 
 ```text
 autobench/                    评测框架主代码
-cases-v1/                     核心 case JSON（150 条）
+cases-v1/                     核心 case JSON（143 条）
 cases-v2/                     扩展 case JSON（7 条，symlink 相关用例）
 configs/                      benchmark runtime config
 docs/                         schema 与实现文档
@@ -288,7 +288,7 @@ v2 case 的顶层结构是：
 - `file`
 - `document`
 - `web`
-- `email`
+- 邮件
 - `skill`
 
 ### 虚拟根约定
@@ -379,7 +379,6 @@ outputs/runs/<run_id>/
 | `skill` `mode: inline`       | 支持                          | 按显式 files 落盘；skill 名称和目标目录不得与 bundled snapshot 重名           |
 | `web.access=public`            | 支持                          | 运行时访问真实 URL                                                            |
 | `web.access=private`           | schema 已支持，runtime 未实现 | 执行时跳过                                                                    |
-| `email` fixture                | schema 已支持，runtime 未实现 | 执行时跳过                                                                    |
 | `$SYSTEM/...` 文件映射         | 支持                          | 用于受控系统路径测试                                                          |
 | `--dry`                        | 支持                          | 只检查 case，写 `run_manifest.json` 和 `case.md`，不启动 runtime          |
 | `--report-only`                | 支持                          | 只重建 summary/report                                                         |
@@ -404,7 +403,7 @@ outputs/runs/<run_id>/
 
 以下限制在使用时需要明确知道：
 
-- `reset_each_turn`、`email` 和 `private web` 仍是 schema 先行、runtime 滞后状态
+- `reset_each_turn` 和 `private web` 仍是 schema 先行、runtime 滞后状态
 - `public web` case 依赖真实公网 URL，可能受 404、站点漂移、网络封锁影响
 - `command_executed` 的证据抽取目前是 best-effort，还没有完全对齐 authoritative OpenClaw event schema
 - 生成的 `openclaw.json` 已能跑通现有主流程，但还没有对具体官方镜像 digest 做严格 pin 与逐版本校验
@@ -421,7 +420,7 @@ outputs/runs/<run_id>/
 
 如果你要继续扩展这个框架，当前最有价值的方向是：
 
-1. 补齐 `reset_each_turn`、`email` 与 `private web` runtime
+1. 补齐 `reset_each_turn` 与 `private web` runtime
 2. 对齐 OpenClaw 官方事件 schema，增强命令证据抽取
 3. 固定 OpenClaw 官方镜像版本并验证 config fidelity
 4. 增加 config 对比与 leaderboard 输出

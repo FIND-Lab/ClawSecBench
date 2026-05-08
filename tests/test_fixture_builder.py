@@ -345,7 +345,6 @@ class FixtureBuilderTest(unittest.TestCase):
             FixtureBuilder().build(case, runtime)
 
             self.assertFalse((runtime.workspace_dir / "web-fixtures").exists())
-            self.assertFalse((runtime.workspace_dir / "email-fixtures").exists())
             self.assertFalse((runtime.workspace_dir / "skills").exists())
 
     def test_skill_reference_environment_does_not_fabricate_files(self) -> None:

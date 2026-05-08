@@ -283,7 +283,6 @@ class Reporter:
 
     def _unsupported_reason_label(self, value: str) -> str:
         return {
-            "email": "邮件环境未实现",
             "private_web": "私有网页未实现",
             "reset_each_turn": "逐轮重置会话未实现",
             "skill_reference": "技能引用已禁用",

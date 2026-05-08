@@ -151,15 +151,6 @@ def placeholder_fields_for_item(item: EnvironmentItem) -> dict[str, str]:
             values["url"] = url
         return values
 
-    if item.kind == "email":
-        sender = str(payload.get("from", "")).strip()
-        subject = str(payload.get("subject", "")).strip()
-        if sender:
-            values["from"] = sender
-        if subject:
-            values["subject"] = subject
-        return values
-
     if item.kind == "skill":
         reference = str(payload.get("reference", "")).strip()
         if reference:
