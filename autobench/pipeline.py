@@ -4,7 +4,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import shutil
 import os
-from queue import Queue
 import secrets
 import traceback
 from dataclasses import asdict
@@ -112,10 +111,6 @@ class AutoBenchPipeline:
 
         supported_case_count = len(supported_entries)
         if supported_entries:
-            port_pool: Queue[int] = Queue()
-            for offset in range(run_config.concurrency):
-                port_pool.put(run_config.profile.gateway_host_port + offset)
-
             with ThreadPoolExecutor(max_workers=run_config.concurrency) as executor:
                 future_to_index = {
                     executor.submit(
@@ -128,7 +123,6 @@ class AutoBenchPipeline:
                         supported_position=supported_position,
                         supported_case_count=supported_case_count,
                         gateway_token=gateway_token,
-                        port_pool=port_pool,
                     ): result_index
                     for supported_position, (result_index, case_position, case) in enumerate(supported_entries, start=1)
                 }
@@ -149,7 +143,6 @@ class AutoBenchPipeline:
         supported_position: int,
         supported_case_count: int,
         gateway_token: str | None,
-        port_pool: Queue[int],
     ) -> CaseRunResult:
         self.logger.info(
             f"case {case_position}/{total_cases} start: "
@@ -157,7 +150,6 @@ class AutoBenchPipeline:
             f"layer={case.metadata.threat_layer}"
         )
         keep_runtime = run_config.keep_runtime and supported_position == supported_case_count
-        gateway_host_port = port_pool.get()
         runtime = None
         stage = "provision"
         try:
@@ -166,7 +158,6 @@ class AutoBenchPipeline:
                 run_config,
                 case=case,
                 case_id=case.metadata.id,
-                gateway_host_port=gateway_host_port,
             )
             stage = "fixture_build"
             fixture_manifest = self.fixture_builder.build(case, runtime)
@@ -217,18 +208,14 @@ class AutoBenchPipeline:
             )
             return result
         finally:
-            try:
-                if runtime is not None:
-                    try:
-                        self.provisioner.teardown(runtime, keep_runtime=keep_runtime)
-                    except Exception as exc:
-                        self.logger.info(
-                            f"{case_label(case.metadata.id)} teardown failed: "
-                            f"{type(exc).__name__}: {exc}"
-                        )
-            finally:
-                if not keep_runtime:
-                    port_pool.put(gateway_host_port)
+            if runtime is not None:
+                try:
+                    self.provisioner.teardown(runtime, keep_runtime=keep_runtime)
+                except Exception as exc:
+                    self.logger.info(
+                        f"{case_label(case.metadata.id)} teardown failed: "
+                        f"{type(exc).__name__}: {exc}"
+                    )
 
     def _finalize_run(self, run_config: RunConfig, run_dir, results: list[CaseRunResult], sample_report_path) -> dict:
         summary = self.reporter.build_summary(run_config.run_id, results, run_dir)

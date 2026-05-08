@@ -209,7 +209,7 @@ make report RUN_ID=run-web-public-20260425-1
 - `REWRITE_CONCURRENCY=50`
 - case 的 canonical `metadata.id` 是字符串，默认与文件名 stem 一致，例如 `0041`；CLI 仍接受 `41` 这种数字简写做筛选
 - `CONCURRENCY=1`
-  benchmark 执行的 case 级并发数；会占用从 `gateway_host_port` 开始的连续端口池
+  benchmark 执行的 case 级并发数；每个 case 使用 Docker 自动分配的 localhost 临时端口，适合并行跑多个 `make run`
 - `RUN_ID=run-adhoc-001`
 - `QUIET=1`
 - `KEEP_RUNTIME=1`

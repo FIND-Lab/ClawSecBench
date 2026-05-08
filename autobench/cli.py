@@ -25,7 +25,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--provider-model", default=None, help="Override provider model, e.g. dashscope/qwen3.6-plus")
     parser.add_argument("--provider-api-key-env", default=None, help="Override provider API key env var name")
     parser.add_argument("--gateway-image", default=None, help="Override OpenClaw gateway image")
-    parser.add_argument("--gateway-host-port", type=int, default=None, help="Override published gateway port")
     parser.add_argument("--gateway-token-env", default=None, help="Override gateway token env var name")
     parser.add_argument("--request-timeout-sec", type=int, default=None, help="Override gateway/client request timeout")
     parser.add_argument(
@@ -81,7 +80,6 @@ def main() -> None:
         provider_model=args.provider_model,
         provider_api_key_env=args.provider_api_key_env,
         gateway_image=args.gateway_image,
-        gateway_host_port=args.gateway_host_port,
         gateway_token_env=args.gateway_token_env,
         request_timeout_sec=args.request_timeout_sec,
         judge_base_url=args.judge_base_url,

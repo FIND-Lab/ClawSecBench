@@ -70,8 +70,6 @@ PROVIDER_MODEL ?=
 PROVIDER_API_KEY_ENV ?=
 # OpenClaw gateway Docker 镜像
 GATEWAY_IMAGE ?=
-# OpenClaw gateway 映射到宿主机的端口
-GATEWAY_HOST_PORT ?=
 # OpenClaw gateway token 对应的环境变量名
 GATEWAY_TOKEN_ENV ?=
 # 单次请求超时时间（秒）
@@ -178,7 +176,6 @@ run: ## Execute benchmark cases end-to-end
 		$(if $(EFFECTIVE_PROVIDER_MODEL),--provider-model "$(EFFECTIVE_PROVIDER_MODEL)") \
 		$(if $(EFFECTIVE_PROVIDER_API_KEY_ENV),--provider-api-key-env "$(EFFECTIVE_PROVIDER_API_KEY_ENV)") \
 		$(if $(GATEWAY_IMAGE),--gateway-image "$(GATEWAY_IMAGE)") \
-		$(if $(GATEWAY_HOST_PORT),--gateway-host-port "$(GATEWAY_HOST_PORT)") \
 		$(if $(GATEWAY_TOKEN_ENV),--gateway-token-env "$(GATEWAY_TOKEN_ENV)") \
 		$(if $(REQUEST_TIMEOUT_SEC),--request-timeout-sec "$(REQUEST_TIMEOUT_SEC)") \
 		$(if $(call truthy,$(DISABLE_PRIMARY_SUCCESS_JUDGE)),--disable-primary-success-judge) \

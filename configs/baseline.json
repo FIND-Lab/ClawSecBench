@@ -4,7 +4,6 @@
     "mode": "compose",
     "gateway_image": "ghcr.io/openclaw/openclaw:2026.4.24",
     "gateway_internal_port": 18789,
-    "gateway_host_port": 18789,
     "gateway_bind": "lan",
     "resources": {
       "cpus": 4.0,

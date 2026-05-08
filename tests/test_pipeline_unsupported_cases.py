@@ -311,7 +311,7 @@ class PipelineUnsupportedCasesTest(unittest.TestCase):
                 verbose=False,
             )
 
-            def provision_side_effect(run_config, *, case, case_id, gateway_host_port):
+            def provision_side_effect(run_config, *, case, case_id):
                 return self._runtime(output_root, case_id)
 
             def run_case_side_effect(case, runtime, fixture_manifest, **kwargs):
@@ -457,7 +457,7 @@ class PipelineUnsupportedCasesTest(unittest.TestCase):
                 verbose=False,
             )
 
-            def provision_side_effect(run_config, *, case, case_id, gateway_host_port):
+            def provision_side_effect(run_config, *, case, case_id):
                 self.assertFalse(case_root.exists(), "expected stale case directory to be removed before provision")
                 return self._runtime(output_root, case_id, run_id=run_id)
 
@@ -659,7 +659,7 @@ class PipelineUnsupportedCasesTest(unittest.TestCase):
                 verbose=False,
             )
 
-            def provision_side_effect(run_config, *, case, case_id, gateway_host_port):
+            def provision_side_effect(run_config, *, case, case_id):
                 self.assertFalse(case_root.exists(), "expected runtime_error case directory to be removed before rerun provision")
                 return self._runtime(output_root, case_id, run_id=run_id)
 
@@ -715,7 +715,7 @@ class PipelineUnsupportedCasesTest(unittest.TestCase):
             self.assertEqual(manifest["summary"]["failed_cases"], 0)
             self.assertEqual(manifest["summary"]["finished_cases"], 1)
 
-    def test_parallel_supported_cases_reuse_fixed_port_pool_and_preserve_result_order(self) -> None:
+    def test_parallel_supported_cases_preserve_result_order(self) -> None:
         def build_case(case_id: str) -> CaseDefinition:
             return CaseDefinition.from_dict(
                 {
@@ -744,7 +744,6 @@ class PipelineUnsupportedCasesTest(unittest.TestCase):
         profile = ApiProfile(name="test")
         profile.gateway.token_env = "AUTOBENCH_TEST_GATEWAY_TOKEN_PARALLEL"
         profile.provider.api_key_env = "AUTOBENCH_TEST_PROVIDER_KEY_PARALLEL"
-        profile.runtime.gateway_host_port = 18789
 
         with tempfile.TemporaryDirectory() as tmp:
             output_root = Path(tmp)
@@ -758,13 +757,9 @@ class PipelineUnsupportedCasesTest(unittest.TestCase):
                 concurrency=2,
             )
 
-            port_assignments: dict[str, int] = {}
-            assignment_lock = threading.Lock()
             first_two_barrier = threading.Barrier(2)
 
-            def provision_side_effect(run_config, *, case, case_id, gateway_host_port):
-                with assignment_lock:
-                    port_assignments[case_id] = gateway_host_port
+            def provision_side_effect(run_config, *, case, case_id):
                 if case_id in {"9101", "9102"}:
                     first_two_barrier.wait(timeout=2)
                 return self._runtime(output_root, case_id, run_id="parallel-supported")
@@ -830,8 +825,6 @@ class PipelineUnsupportedCasesTest(unittest.TestCase):
             ), patch("autobench.pipeline.LLMJudge.from_profile", return_value=None):
                 manifest = pipeline.run(run_config)
 
-            self.assertEqual({port_assignments["9101"], port_assignments["9102"]}, {18789, 18790})
-            self.assertIn(port_assignments["9103"], {18789, 18790})
             self.assertEqual(teardown.call_count, 3)
 
             result_names = [Path(path).name for path in manifest["summary"]["result_paths"]]

@@ -213,7 +213,6 @@ class RuntimeProfile:
     mode: str = "compose"
     gateway_image: str = "ghcr.io/openclaw/openclaw:2026.4.24"
     gateway_internal_port: int = 18789
-    gateway_host_port: int = 18789
     gateway_bind: str = "lan"
     service_name: str = "openclaw-gateway"
     gateway_log_level: str | None = None
@@ -274,10 +273,6 @@ class ApiProfile:
     @property
     def gateway_internal_port(self) -> int:
         return self.runtime.gateway_internal_port
-
-    @property
-    def gateway_host_port(self) -> int:
-        return self.runtime.gateway_host_port
 
     @property
     def extra_config(self) -> dict[str, Any]:

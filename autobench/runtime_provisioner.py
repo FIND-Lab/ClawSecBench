@@ -31,7 +31,6 @@ class RuntimeProvisioner:
         *,
         case: CaseDefinition | None = None,
         case_id: str | None = None,
-        gateway_host_port: int | None = None,
     ) -> RuntimeHandle:
         if config.profile.runtime.mode != "compose":
             raise RuntimeProvisionerError(f"unsupported runtime mode: {config.profile.runtime.mode}")
@@ -55,11 +54,12 @@ class RuntimeProvisioner:
             path.mkdir(parents=True, exist_ok=True)
 
         runtime_suffix = f"{config.run_id}-{case_dirname(case_id)}" if case_id is not None else config.run_id
-        project_name = _safe_name(f"autobench-{runtime_suffix}")
+        # Docker Compose project name rejects dots (.), so normalize run ids
+        # that may include model versions like qwen3.5 / kimi-k2.5.
+        project_name = _safe_name(f"autobench-{runtime_suffix}", allow_dot=False)
         container_name = _safe_name(f"autobench-gateway-{runtime_suffix}")
         network_name = f"{project_name}_default"
-        published_port = gateway_host_port if gateway_host_port is not None else config.profile.gateway_host_port
-        gateway_url = f"http://127.0.0.1:{published_port}"
+        gateway_url = "http://127.0.0.1:0"
 
         openclaw_config_path = state_dir / "openclaw.json"
         openclaw_config = self._build_openclaw_config(config.profile)
@@ -75,7 +75,6 @@ class RuntimeProvisioner:
             state_dir=state_dir,
             home_dir=home_dir,
             logs_dir=logs_dir,
-            gateway_host_port=published_port,
             system_mounts=system_mounts,
         )
         compose_path.write_text(json.dumps(compose_payload, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -101,11 +100,18 @@ class RuntimeProvisioner:
         try:
             self.logger.info(
                 f"starting OpenClaw gateway image={config.profile.runtime.gateway_image} "
-                f"port=127.0.0.1:{published_port}"
+                "port=auto"
             )
             self._compose(handle, ["down", "--remove-orphans"], ignore_error=True)
             self._compose(handle, ["up", "-d"])
-            self.logger.info(f"waiting for gateway readiness: {gateway_url}/readyz")
+            resolved_port = self._resolve_published_gateway_port(
+                handle,
+                service_name=config.profile.runtime.service_name,
+                container_port=config.profile.runtime.gateway_internal_port,
+            )
+            handle.gateway_url = f"http://127.0.0.1:{resolved_port}"
+            self.logger.info(f"resolved gateway published port: 127.0.0.1:{resolved_port}")
+            self.logger.info(f"waiting for gateway readiness: {handle.gateway_url}/readyz")
             self._wait_for_gateway_health(handle)
         except Exception as exc:
             diagnostics = ""
@@ -219,7 +225,6 @@ class RuntimeProvisioner:
         state_dir: Path,
         home_dir: Path,
         logs_dir: Path,
-        gateway_host_port: int,
         system_mounts: list[tuple[Path, str]] | None = None,
     ) -> dict[str, Any]:
         env_entries = [
@@ -266,9 +271,7 @@ class RuntimeProvisioner:
             # value and can exhaust Docker's default subnet pool during full runs.
             "network_mode": "bridge",
             "command": command,
-            "ports": [
-                f"127.0.0.1:{gateway_host_port}:{profile.runtime.gateway_internal_port}",
-            ],
+            "ports": self._compose_port_bindings(gateway_internal_port=profile.runtime.gateway_internal_port),
             "environment": env_entries,
             "volumes": volumes,
         }
@@ -405,6 +408,46 @@ class RuntimeProvisioner:
 
         raise RuntimeProvisionerError("gateway health check timed out")
 
+    def _resolve_published_gateway_port(
+        self,
+        handle: RuntimeHandle,
+        *,
+        service_name: str,
+        container_port: int,
+        timeout_sec: int = 15,
+    ) -> int:
+        deadline = time.time() + timeout_sec
+        last_error: str | None = None
+        while time.time() < deadline:
+            result = self._compose(
+                handle,
+                ["port", service_name, str(container_port)],
+                ignore_error=True,
+            )
+            line = result.stdout.strip().splitlines()[0].strip() if result.stdout.strip() else ""
+            if result.returncode == 0 and line:
+                port = _parse_compose_port_output(line)
+                if port is not None:
+                    return port
+                last_error = f"unexpected output from docker compose port: {line!r}"
+            else:
+                stderr = result.stderr.strip()
+                if stderr:
+                    last_error = stderr
+            time.sleep(0.5)
+
+        suffix = f": {last_error}" if last_error else ""
+        raise RuntimeProvisionerError(f"failed to resolve published gateway port{suffix}")
+
+    def _compose_port_bindings(self, *, gateway_internal_port: int) -> list[Any]:
+        return [
+            {
+                "target": gateway_internal_port,
+                "host_ip": "127.0.0.1",
+                "protocol": "tcp",
+            }
+        ]
+
     def _compose(
         self,
         handle: RuntimeHandle,
@@ -485,8 +528,9 @@ def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]
     return merged
 
 
-def _safe_name(value: str) -> str:
-    safe = re.sub(r"[^a-zA-Z0-9_.-]+", "-", value).strip("-_.")
+def _safe_name(value: str, *, allow_dot: bool = True) -> str:
+    invalid_chars = r"[^a-zA-Z0-9_.-]+" if allow_dot else r"[^a-zA-Z0-9_-]+"
+    safe = re.sub(invalid_chars, "-", value).strip("-_.")
     return safe.lower() or "autobench"
 
 
@@ -507,3 +551,16 @@ def _format_completed_process(result: subprocess.CompletedProcess[str]) -> str:
     if stderr:
         parts.extend(["stderr:", stderr])
     return "\n".join(parts)
+
+
+def _parse_compose_port_output(text: str) -> int | None:
+    match = re.search(r":(?P<port>\d+)\s*$", text.strip())
+    if match is None:
+        return None
+    try:
+        port = int(match.group("port"))
+    except ValueError:
+        return None
+    if port <= 0 or port > 65535:
+        return None
+    return port

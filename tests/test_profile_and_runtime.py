@@ -3,18 +3,47 @@ from __future__ import annotations
 import http.server
 import json
 import os
+import subprocess
 import tempfile
 import threading
 import unittest
 from pathlib import Path
 from unittest import mock
 
-from autobench.models import CaseDefinition, RuntimeHandle
+from autobench.models import CaseDefinition, RunConfig, RuntimeHandle
 from autobench.runtime_provisioner import RuntimeProvisioner
 from autobench.settings import load_api_profile
 
 
 class ProfileAndRuntimeTest(unittest.TestCase):
+    def test_provision_compose_project_name_replaces_dots_from_run_id(self) -> None:
+        profile = load_api_profile(Path("configs/baseline.json"))
+        provisioner = RuntimeProvisioner()
+        with tempfile.TemporaryDirectory() as tmp:
+            run_config = RunConfig(
+                run_id="run-20260501-015311-qwen3.5-35b-a3b",
+                cases_dir=Path("cases-v1"),
+                output_root=Path(tmp),
+                profile=profile,
+            )
+            with mock.patch.object(provisioner, "_compose"), mock.patch.object(
+                provisioner,
+                "_resolve_published_gateway_port",
+                return_value=49123,
+            ), mock.patch.object(provisioner, "_wait_for_gateway_health"):
+                handle = provisioner.provision(
+                    run_config,
+                    case=None,
+                    case_id=None,
+                )
+
+        self.assertIsNotNone(handle.compose_project_name)
+        self.assertNotIn(".", handle.compose_project_name or "")
+        self.assertEqual(
+            handle.compose_project_name,
+            "autobench-run-20260501-015311-qwen3-5-35b-a3b",
+        )
+
     def test_loads_grouped_profile_and_applies_overrides(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             profile_path = Path(tmp) / "profile.json"
@@ -46,18 +75,58 @@ class ProfileAndRuntimeTest(unittest.TestCase):
                 provider_base_url="https://example.test/v1",
                 provider_model="openai/test-model",
                 provider_api_key_env="TEST_API_KEY",
-                gateway_host_port=19999,
             )
 
             self.assertEqual(profile.provider.base_url, "https://example.test/v1")
             self.assertEqual(profile.provider.model, "openai/test-model")
         self.assertEqual(profile.provider.api_key_env, "TEST_API_KEY")
-        self.assertEqual(profile.runtime.gateway_host_port, 19999)
         self.assertEqual(profile.runtime.resources.cpus, 1.5)
         self.assertEqual(profile.runtime.resources.memory, "3g")
         self.assertEqual(profile.runtime.resources.pids_limit, 256)
         self.assertEqual(profile.gateway.request_timeout_sec, 300)
         self.assertEqual(profile.gateway.agent_target, "openclaw/default")
+
+    def test_runtime_profile_rejects_removed_gateway_host_port_field(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            profile_path = Path(tmp) / "profile.json"
+            profile_path.write_text(
+                json.dumps(
+                    {
+                        "name": "test",
+                        "runtime": {"gateway_host_port": 19999},
+                        "provider": {
+                            "base_url": "https://api.openai.com/v1",
+                            "api_key_env": "OPENAI_API_KEY",
+                            "model": "openai/gpt-5.4",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, r"gateway_host_port"):
+                load_api_profile(profile_path)
+
+    def test_runtime_profile_rejects_removed_port_allocation_field(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            profile_path = Path(tmp) / "profile.json"
+            profile_path.write_text(
+                json.dumps(
+                    {
+                        "name": "test",
+                        "runtime": {"port_allocation": "fixed"},
+                        "provider": {
+                            "base_url": "https://api.openai.com/v1",
+                            "api_key_env": "OPENAI_API_KEY",
+                            "model": "openai/gpt-5.4",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, r"port_allocation"):
+                load_api_profile(profile_path)
 
     def test_rejects_unknown_top_level_profile_keys(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -148,7 +217,6 @@ class ProfileAndRuntimeTest(unittest.TestCase):
             state_dir=Path("/tmp/autobench/openclaw-state"),
             home_dir=Path("/tmp/autobench/home"),
             logs_dir=Path("/tmp/autobench/logs"),
-            gateway_host_port=18789,
             system_mounts=[],
         )
 
@@ -169,7 +237,16 @@ class ProfileAndRuntimeTest(unittest.TestCase):
         self.assertEqual(service["image"], "ghcr.io/openclaw/openclaw:2026.4.24")
         self.assertEqual(service["user"], f"{os.getuid()}:{os.getgid()}")
         self.assertEqual(service["network_mode"], "bridge")
-        self.assertIn("127.0.0.1:18789:18789", service["ports"])
+        self.assertEqual(
+            service["ports"],
+            [
+                {
+                    "target": 18789,
+                    "host_ip": "127.0.0.1",
+                    "protocol": "tcp",
+                }
+            ],
+        )
         self.assertIn("DASHSCOPE_API_KEY", service["environment"])
         self.assertIn("OPENCLAW_GATEWAY_TOKEN", service["environment"])
         self.assertIn("OPENCLAW_SKIP_CHANNELS=1", service["environment"])
@@ -213,7 +290,6 @@ class ProfileAndRuntimeTest(unittest.TestCase):
                 state_dir=Path("/tmp/autobench/openclaw-state"),
                 home_dir=Path("/tmp/autobench/home"),
                 logs_dir=Path("/tmp/autobench/logs"),
-                gateway_host_port=18789,
                 system_mounts=[],
             )
 
@@ -467,12 +543,77 @@ class ProfileAndRuntimeTest(unittest.TestCase):
             state_dir=Path("/tmp/autobench/openclaw-state"),
             home_dir=Path("/tmp/autobench/home"),
             logs_dir=Path("/tmp/autobench/logs"),
-            gateway_host_port=18789,
             system_mounts=[],
         )
 
         self.assertEqual(list(compose["services"]), ["openclaw-gateway"])
         self.assertEqual(compose["services"]["openclaw-gateway"]["network_mode"], "bridge")
+
+    def test_runtime_compose_uses_ephemeral_localhost_port_binding(self) -> None:
+        profile = load_api_profile(Path("configs/baseline.json"))
+        provisioner = RuntimeProvisioner()
+
+        compose = provisioner._build_compose_file(
+            profile,
+            container_name="autobench-gateway-test",
+            workspace_dir=Path("/tmp/autobench/workspace"),
+            state_dir=Path("/tmp/autobench/openclaw-state"),
+            home_dir=Path("/tmp/autobench/home"),
+            logs_dir=Path("/tmp/autobench/logs"),
+            system_mounts=[],
+        )
+
+        service = compose["services"]["openclaw-gateway"]
+        self.assertEqual(
+            service["ports"],
+            [
+                {
+                    "target": 18789,
+                    "host_ip": "127.0.0.1",
+                    "protocol": "tcp",
+                }
+            ],
+        )
+
+    def test_resolve_published_gateway_port_parses_compose_port_output(self) -> None:
+        provisioner = RuntimeProvisioner()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            handle = RuntimeHandle(
+                run_dir=root,
+                runtime_dir=root,
+                artifacts_dir=root,
+                workspace_dir=root,
+                state_dir=root,
+                home_dir=root,
+                system_dir=root,
+                logs_dir=root,
+                network_name="autobench-test",
+                container_name="autobench-gateway-test",
+                openclaw_config_path=root / "openclaw.json",
+                gateway_url="http://127.0.0.1:0",
+                compose_path=root / "compose.yaml",
+                compose_project_name="autobench-test",
+            )
+
+            with mock.patch.object(
+                provisioner,
+                "_compose",
+                return_value=subprocess.CompletedProcess(
+                    args=["docker", "compose", "port"],
+                    returncode=0,
+                    stdout="127.0.0.1:49123\n",
+                    stderr="",
+                ),
+            ):
+                port = provisioner._resolve_published_gateway_port(
+                    handle,
+                    service_name="openclaw-gateway",
+                    container_port=18789,
+                    timeout_sec=1,
+                )
+
+        self.assertEqual(port, 49123)
 
 
 if __name__ == "__main__":

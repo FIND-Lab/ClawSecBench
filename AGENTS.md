@@ -95,7 +95,7 @@ CLI entry:
 - Schema-valid but runtime-unsupported cases are skipped explicitly before provisioning. Current skip codes include `reset_each_turn`, `email`, `private_web`, and `skill_reference`; they are counted in summary/report as `skipped_unsupported` instead of aborting the run.
 - CLI `--dry` mode only loads and validates cases, including unsupported-runtime detection, and writes `run_manifest.json` plus `case.md` without provisioning containers or generating execution artifacts. CLI `--report-only` rebuilds `summary.json` and `report.md` from existing per-case evaluation artifacts.
 - Default run behavior now supports same-run-id resume: cases with existing non-failed/non-skipped evaluation artifacts are reused and skipped; `runtime_error`/`skipped_unsupported`/missing-or-invalid artifacts are rerun.
-- Benchmark execution supports case-level parallelism via `concurrency`; workers reuse a fixed gateway host-port pool derived from the configured base port.
+- Benchmark execution supports case-level parallelism via `concurrency`; runtime ports are always auto-published by Docker on localhost and resolved after startup.
 - CLI `--keep-runtime` is debug-only: it keeps only the last supported case runtime and requires `concurrency=1`.
 - Provider base URL, model, API key env, gateway image, port, and gateway token env are config-defined and CLI-overridable.
 - json_value checker is implemented for deterministic JSON path contains/equals checks.
@@ -154,7 +154,6 @@ Optional filters:
 - --provider-model dashscope/qwen3.6-plus
 - --provider-api-key-env DASHSCOPE_API_KEY
 - --gateway-image ghcr.io/openclaw/openclaw:2026.4.24
-- --gateway-host-port 18789
 - --gateway-token-env OPENCLAW_GATEWAY_TOKEN
 
 ## 7. Handoff Checklist

@@ -60,7 +60,6 @@ Supported fields:
 | `mode` | enum | currently only `compose` |
 | `gateway_image` | string | Docker image tag or digest reference |
 | `gateway_internal_port` | integer | `1..65535` |
-| `gateway_host_port` | integer | `1..65535` |
 | `gateway_bind` | string | gateway bind target such as `lan` |
 | `service_name` | string | compose service name |
 | `gateway_log_level` | string | non-blank log level, e.g. `debug` |
@@ -123,7 +122,6 @@ Important defaults today:
 
 - `runtime.mode = "compose"`
 - `runtime.gateway_image = "ghcr.io/openclaw/openclaw:2026.4.24"`
-- `runtime.gateway_host_port = 18789`
 - `gateway.agent_target = "openclaw/default"`
 - `gateway.token_env = "OPENCLAW_GATEWAY_TOKEN"`
 - `gateway.request_timeout_sec = 300`
@@ -145,7 +143,6 @@ CLI flags such as:
 - `--provider-model`
 - `--provider-api-key-env`
 - `--gateway-image`
-- `--gateway-host-port`
 - `--gateway-token-env`
 - `--request-timeout-sec`
 
@@ -165,7 +162,6 @@ In other words:
     "mode": "compose",
     "gateway_image": "ghcr.io/openclaw/openclaw:2026.4.24",
     "gateway_internal_port": 18789,
-    "gateway_host_port": 18789,
     "gateway_bind": "lan",
     "resources": {
       "cpus": 4.0,

@@ -86,11 +86,6 @@
           "minimum": 1,
           "maximum": 65535
         },
-        "gateway_host_port": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 65535
-        },
         "gateway_bind": {
           "$ref": "#/$defs/trimmedString"
         },

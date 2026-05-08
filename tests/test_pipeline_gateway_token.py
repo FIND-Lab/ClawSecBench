@@ -4,7 +4,6 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
-from queue import Queue
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -125,9 +124,6 @@ class PipelineGatewayTokenTest(unittest.TestCase):
                 path.mkdir(parents=True, exist_ok=True)
 
             pipeline = AutoBenchPipeline()
-            port_pool: Queue[int] = Queue()
-            port_pool.put(18789)
-
             with patch.object(pipeline.provisioner, "provision", return_value=runtime), patch.object(
                 pipeline.provisioner, "teardown"
             ), patch.object(pipeline.fixture_builder, "build", return_value={"case_workspace": str(runtime.workspace_dir)}), patch.object(
@@ -155,7 +151,6 @@ class PipelineGatewayTokenTest(unittest.TestCase):
                     supported_position=1,
                     supported_case_count=1,
                     gateway_token="token",
-                    port_pool=port_pool,
                 )
 
         self.assertEqual(run_case.call_args.kwargs["request_timeout_sec"], 900)

@@ -28,7 +28,6 @@ def load_api_profile(
     provider_model: str | None = None,
     provider_api_key_env: str | None = None,
     gateway_image: str | None = None,
-    gateway_host_port: int | None = None,
     gateway_token_env: str | None = None,
     request_timeout_sec: int | None = None,
     judge_base_url: str | None = None,
@@ -57,8 +56,6 @@ def load_api_profile(
         profile.provider.api_key_env = provider_api_key_env
     if gateway_image:
         profile.runtime.gateway_image = gateway_image
-    if gateway_host_port is not None:
-        profile.runtime.gateway_host_port = gateway_host_port
     if gateway_token_env:
         profile.gateway.token_env = gateway_token_env
     if request_timeout_sec is not None:
@@ -104,7 +101,6 @@ def _load_runtime_profile(payload: dict[str, Any]) -> RuntimeProfile:
         mode=str(raw.get("mode", "compose")),
         gateway_image=str(raw.get("gateway_image", "ghcr.io/openclaw/openclaw:2026.4.24")),
         gateway_internal_port=int(raw.get("gateway_internal_port", 18789)),
-        gateway_host_port=int(raw.get("gateway_host_port", 18789)),
         gateway_bind=str(raw.get("gateway_bind", "lan")),
         service_name=str(raw.get("service_name", "openclaw-gateway")),
         gateway_log_level=gateway_log_level,
@@ -219,7 +215,6 @@ def build_run_config(
     provider_model: str | None = None,
     provider_api_key_env: str | None = None,
     gateway_image: str | None = None,
-    gateway_host_port: int | None = None,
     gateway_token_env: str | None = None,
     request_timeout_sec: int | None = None,
     judge_base_url: str | None = None,
@@ -236,7 +231,6 @@ def build_run_config(
         provider_model=provider_model,
         provider_api_key_env=provider_api_key_env,
         gateway_image=gateway_image,
-        gateway_host_port=gateway_host_port,
         gateway_token_env=gateway_token_env,
         request_timeout_sec=request_timeout_sec,
         judge_base_url=judge_base_url,
