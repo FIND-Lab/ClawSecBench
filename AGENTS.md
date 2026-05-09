@@ -43,7 +43,7 @@ Chosen runtime mode:
 
 2) Runtime Provisioner
 - File: autobench/runtime_provisioner.py
-- Responsibility: create per-case runtime directories, generate official OpenClaw config and compose.yaml, apply configured per-container resource limits, start/stop one gateway container per case with docker compose, wait for health.
+- Responsibility: create per-case runtime directories, generate official OpenClaw config and compose.yaml, apply configured per-container resource limits, start/stop one gateway container per case with docker compose, wait for health, and clean per-case `openclaw-state/plugin-runtime-deps` cache artifacts during teardown.
 
 3) Fixture Builder
 - File: autobench/fixture_builder.py

@@ -615,6 +615,68 @@ class ProfileAndRuntimeTest(unittest.TestCase):
 
         self.assertEqual(port, 49123)
 
+    def test_teardown_removes_plugin_runtime_deps_after_compose_down(self) -> None:
+        provisioner = RuntimeProvisioner()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "openclaw-state"
+            deps_dir = state_dir / "plugin-runtime-deps"
+            deps_dir.mkdir(parents=True, exist_ok=True)
+            (deps_dir / "cached.txt").write_text("cache", encoding="utf-8")
+            handle = RuntimeHandle(
+                run_dir=root,
+                runtime_dir=root / "runtime",
+                artifacts_dir=root / "artifacts",
+                workspace_dir=root / "workspace",
+                state_dir=state_dir,
+                home_dir=root / "home",
+                system_dir=root / "system",
+                logs_dir=root / "logs",
+                network_name="autobench-test",
+                container_name="autobench-gateway-test",
+                openclaw_config_path=state_dir / "openclaw.json",
+                gateway_url="http://127.0.0.1:18789",
+                compose_path=root / "runtime" / "compose.yaml",
+                compose_project_name="autobench-test",
+            )
+
+            with mock.patch.object(provisioner, "_compose") as compose:
+                provisioner.teardown(handle, keep_runtime=False)
+
+        compose.assert_called_once_with(handle, ["down", "--remove-orphans"], ignore_error=True)
+        self.assertFalse(deps_dir.exists())
+
+    def test_teardown_removes_plugin_runtime_deps_even_when_keep_runtime_is_enabled(self) -> None:
+        provisioner = RuntimeProvisioner()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "openclaw-state"
+            deps_dir = state_dir / "plugin-runtime-deps"
+            deps_dir.mkdir(parents=True, exist_ok=True)
+            (deps_dir / "cached.txt").write_text("cache", encoding="utf-8")
+            handle = RuntimeHandle(
+                run_dir=root,
+                runtime_dir=root / "runtime",
+                artifacts_dir=root / "artifacts",
+                workspace_dir=root / "workspace",
+                state_dir=state_dir,
+                home_dir=root / "home",
+                system_dir=root / "system",
+                logs_dir=root / "logs",
+                network_name="autobench-test",
+                container_name="autobench-gateway-test",
+                openclaw_config_path=state_dir / "openclaw.json",
+                gateway_url="http://127.0.0.1:18789",
+                compose_path=root / "runtime" / "compose.yaml",
+                compose_project_name="autobench-test",
+            )
+
+            with mock.patch.object(provisioner, "_compose") as compose:
+                provisioner.teardown(handle, keep_runtime=True)
+
+        compose.assert_not_called()
+        self.assertFalse(deps_dir.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

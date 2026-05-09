@@ -4,6 +4,7 @@ import json
 import http.client
 import os
 import re
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -131,15 +132,31 @@ class RuntimeProvisioner:
         return handle
 
     def teardown(self, handle: RuntimeHandle, *, keep_runtime: bool = False) -> None:
-        if keep_runtime:
-            self.logger.info(f"keeping runtime alive: compose={handle.compose_path}")
-            return
-        if handle.compose_path and handle.compose_project_name:
-            self.logger.info("stopping OpenClaw gateway")
-            self._compose(handle, ["down", "--remove-orphans"], ignore_error=True)
-            return
-        self._run([self.docker_bin, "rm", "-f", handle.container_name], ignore_error=True)
-        self._run([self.docker_bin, "network", "rm", handle.network_name], ignore_error=True)
+        try:
+            if keep_runtime:
+                self.logger.info(f"keeping runtime alive: compose={handle.compose_path}")
+                return
+            if handle.compose_path and handle.compose_project_name:
+                self.logger.info("stopping OpenClaw gateway")
+                self._compose(handle, ["down", "--remove-orphans"], ignore_error=True)
+                return
+            self._run([self.docker_bin, "rm", "-f", handle.container_name], ignore_error=True)
+            self._run([self.docker_bin, "network", "rm", handle.network_name], ignore_error=True)
+        finally:
+            self._cleanup_plugin_runtime_deps(handle)
+
+    def _cleanup_plugin_runtime_deps(self, handle: RuntimeHandle) -> None:
+        deps_dir = handle.state_dir / "plugin-runtime-deps"
+        try:
+            if deps_dir.is_symlink() or deps_dir.is_file():
+                deps_dir.unlink()
+                self.logger.info(f"removed plugin runtime deps artifact: {deps_dir}")
+                return
+            if deps_dir.is_dir():
+                shutil.rmtree(deps_dir)
+                self.logger.info(f"removed plugin runtime deps artifact: {deps_dir}")
+        except OSError as exc:
+            self.logger.info(f"failed to remove plugin runtime deps artifact: {deps_dir} ({exc})")
 
     def _build_openclaw_config(self, profile: ApiProfile) -> dict[str, Any]:
         provider_model_id = profile.provider.model.split("/", 1)[-1]

@@ -367,6 +367,10 @@ outputs/runs/<run_id>/
 - 当某 case 需要重跑时，runner 仍会先清理
   `outputs/runs/<run_id>/cases/case-<id>/`，只重建该 case 的目录内容；
   其他 case 目录和 run 级文件会保留不动
+- 每个 case 结束后都会清理
+  `outputs/runs/<run_id>/cases/case-<id>/openclaw-state/plugin-runtime-deps/`
+  这类 OpenClaw 运行期依赖缓存目录，避免无意义占用磁盘；即使开启
+  `KEEP_RUNTIME=1` 也不会保留这部分缓存
 
 ## 支持矩阵
 
