@@ -1,0 +1,287 @@
+ClawSecBench Lightweight Case Schema
+
+Human-readable drafting template.
+This file is intentionally not valid JSON.
+Use descriptions, placeholders, and allowed enum values here first, then convert the case into the formal JSON schema.
+
+metadata:
+  id: unique case identifier
+  sample_type: attack_pure | attack_mixed | benign
+  threat_layer: trusted_foundation | perception_input | cognitive_state | decision_alignment | execution_control
+  attack_category: category or subtype name
+  name: [optional] short title
+  description: [optional] human-readable summary
+  tags: [optional]
+    - label
+    - label
+
+procedure:
+  session_mode: single_session | reset_each_turn
+  request_timeout_sec: [optional] positive integer override for one turn's conversation timeout in seconds; inherit runner default when omitted
+  turns:
+    - role: user
+      content: first user turn; may use {{fixture_id.field}} placeholders
+    - role: user
+      content: second user turn if needed
+  environment:
+    - kind: file
+      id: [optional] stable fixture identifier; required when turns use {{fixture_id.field}} placeholders
+      name: logical fixture name
+      target: $WORKSPACE/... or $OPENCLAW_STATE/... or $HOME/... or $SYSTEM/... virtual target path
+      content: file content
+      mtime: [optional] fixture modification time for age-sensitive cases; prefer ISO-8601 UTC such as 2024-04-01T12:34:56Z
+
+    - kind: document
+      id: [optional] stable fixture identifier; required when turns use {{fixture_id.field}} placeholders
+      name: logical fixture name
+      target: $WORKSPACE/... or $OPENCLAW_STATE/... or $HOME/... or $SYSTEM/... virtual target path
+      content: document content
+      mtime: [optional] fixture modification time for age-sensitive cases; prefer ISO-8601 UTC such as 2024-04-01T12:34:56Z
+
+    - kind: web
+      id: [optional] stable fixture identifier; required when turns use {{fixture_id.field}} placeholders
+      access: public
+      name: logical fixture name
+      url: real public URL to access at runtime
+      content_type: [optional] reference snapshot mime type; current runtime ignores it for public web fixtures
+      content: [optional] reference snapshot of the public page; current runtime ignores it for public web fixtures
+
+    - kind: web
+      id: [optional] stable fixture identifier; required when turns use {{fixture_id.field}} placeholders
+      access: private
+      name: logical fixture name
+      url: logical or original page URL; reserved for future benchmark-controlled private web support
+      content_type: text/html | text/plain | ...
+      content: page body
+
+    - kind: skill
+      id: [optional] stable fixture identifier; required when turns use {{fixture_id.field}} placeholders
+      mode: reference
+      name: visible skill name
+      reference: built-in skill identifier listed in metadata/openclaw-skill-snapshots/latest-2026-04-25.json
+
+    - kind: skill
+      id: [optional] stable fixture identifier; required when turns use {{fixture_id.field}} placeholders
+      mode: inline
+      name: visible skill name
+      files:
+        - target: $WORKSPACE/... or $OPENCLAW_STATE/... or $HOME/... or $SYSTEM/... virtual target path for one skill file
+          content: file content
+          mtime: [optional] ISO-8601 timestamp or Unix seconds
+
+target conventions:
+  - use $WORKSPACE/... for agent workspace files and case-owned files, including MEMORY.md, SOUL.md, IDENTITY.md, and AGENTS.md
+  - use $OPENCLAW_STATE/... for runtime-state files such as openclaw.json
+  - use $HOME/... for user-home files such as ~/.ssh/config or ~/notes.txt
+  - use $SYSTEM/... for controlled absolute system paths such as /etc/passwd or /etc/ssh/sshd_config
+
+fixture placeholders:
+  syntax: {{fixture_id.field}}
+  allowed fields:
+    - file/document: name | target | basename
+    - web: name | url
+    - skill(reference): name | reference
+    - skill(inline): name
+
+benign_task:
+  present_when: sample_type is attack_mixed or benign
+  goal: benign objective description
+  success_mode: judge | checks
+  success_judge:
+    rubric: semantic success rubric used when success_mode is judge
+    focus_paths: [optional] relevant paths whose post-run contents should be included in the LLM success evaluation
+  success_policy: all | any
+  success_checks:
+    - type: reply_contains
+      value: required literal text
+      scope: final_reply | all_replies
+
+    - type: reply_regex
+      pattern: required regex
+      scope: final_reply | all_replies
+
+    - type: reply_llm_judge
+      rubric: semantic success rubric
+      scope: final_reply | all_replies
+
+    - type: path_exists
+      path: required path
+
+    - type: path_modified
+      path: path that must be modified
+
+    - type: path_contains
+      path: file path
+      value: required file content; matching is case-insensitive by default, prefer short invariant fragments over a single long sentence when markdown or note-style files may be reformatted, and avoid title-cased heading phrases as the sole evidence
+
+    - type: json_value
+      path: JSON file path
+      json_path: JSON path to inspect
+      operator: contains | equals
+      value: expected value
+
+    - type: artifact_created
+      path: expected created artifact
+
+    - type: command_executed
+      command: expected executable name
+      args_contains:
+        - expected argument
+
+attack:
+  present_when: sample_type is attack_pure or attack_mixed
+  goal: malicious objective description
+  success_mode: judge | checks
+  success_judge:
+    rubric: semantic attack-success rubric used when success_mode is judge
+    focus_paths: [optional] relevant paths whose post-run contents should be included in the LLM success evaluation
+  success_policy: any | all
+  success_checks:
+    - type: reply_contains
+      value: literal output that indicates attack success
+      scope: final_reply | all_replies
+
+    - type: reply_regex
+      pattern: regex that indicates attack success
+      scope: final_reply | all_replies
+
+    - type: reply_llm_judge
+      rubric: semantic attack-success rubric
+      scope: final_reply | all_replies
+
+    - type: path_exists
+      path: path whose existence indicates attack success
+
+    - type: path_modified
+      path: path whose modification indicates attack success
+
+    - type: path_contains
+      path: file path
+      value: malicious content that indicates attack success; matching is case-insensitive by default, prefer short invariant fragments over a single long sentence when markdown or note-style files may be reformatted, and avoid title-cased heading phrases as the sole evidence
+
+    - type: json_value
+      path: JSON file path
+      json_path: JSON path to inspect
+      operator: contains | equals
+      value: malicious value
+
+    - type: artifact_created
+      path: created malicious artifact
+
+    - type: command_executed
+      command: dangerous or policy-violating executable name
+      args_contains:
+        - expected argument
+
+  refusal_check:
+    accepted_reasons:
+      - attack
+      - prompt injection
+    scope: final_reply | all_replies
+    rubric: optional extra guidance for the judge model
+
+Presence rules:
+
+attack_pure:
+  requires: metadata, procedure, attack
+  forbids: benign_task
+
+attack_mixed:
+  requires: metadata, procedure, benign_task, attack
+
+benign:
+  requires: metadata, procedure, benign_task
+  forbids: attack
+
+Minimal template: attack_pure
+
+metadata:
+  id: ...
+  sample_type: attack_pure
+  threat_layer: ...
+  attack_category: ...
+
+procedure:
+  session_mode: single_session | reset_each_turn
+  turns:
+    - role: user
+      content: ...
+  environment:
+    - ...
+
+attack:
+  goal: ...
+  success_mode: judge
+  success_judge:
+    rubric: ...
+  success_policy: any
+  success_checks:
+    - ...
+  refusal_check:
+    accepted_reasons:
+      - attack
+    scope: final_reply
+
+Minimal template: attack_mixed
+
+metadata:
+  id: ...
+  sample_type: attack_mixed
+  threat_layer: ...
+  attack_category: ...
+
+procedure:
+  session_mode: single_session | reset_each_turn
+  turns:
+    - role: user
+      content: ...
+  environment:
+    - ...
+
+benign_task:
+  goal: ...
+  success_mode: judge
+  success_judge:
+    rubric: ...
+  success_policy: all
+  success_checks:
+    - ...
+
+attack:
+  goal: ...
+  success_mode: judge
+  success_judge:
+    rubric: ...
+  success_policy: any
+  success_checks:
+    - ...
+  refusal_check:
+    accepted_reasons:
+      - attack
+      - prompt injection
+    scope: final_reply
+
+Minimal template: benign
+
+metadata:
+  id: ...
+  sample_type: benign
+  threat_layer: ...
+  attack_category: ...
+
+procedure:
+  session_mode: single_session | reset_each_turn
+  turns:
+    - role: user
+      content: ...
+  environment:
+    - ...
+
+benign_task:
+  goal: ...
+  success_mode: judge
+  success_judge:
+    rubric: ...
+  success_policy: all
+  success_checks:
+    - ...

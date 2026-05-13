@@ -1,0 +1,4 @@
+# Core Python dependencies for the benchmark framework and case rewrite script.
+joblib>=1.3
+jsonschema>=4.0
+openai>=1.0

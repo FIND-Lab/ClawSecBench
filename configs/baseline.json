@@ -1,0 +1,33 @@
+{
+  "name": "baseline",
+  "runtime": {
+    "mode": "compose",
+    "gateway_image": "ghcr.io/openclaw/openclaw:2026.4.24",
+    "gateway_internal_port": 18789,
+    "gateway_bind": "lan",
+    "resources": {
+      "cpus": 4.0,
+      "memory": "8g",
+      "pids_limit": 512
+    }
+  },
+  "gateway": {
+    "agent_target": "openclaw/default",
+    "token_env": "OPENCLAW_GATEWAY_TOKEN",
+    "request_timeout_sec": 300
+  },
+  "provider": {
+    "name": "dashscope",
+    "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "api_key_env": "DASHSCOPE_API_KEY",
+    "model": "dashscope/qwen3.6-plus",
+    "api": "openai-completions",
+    "auth": "api-key"
+  },
+  "judge": {
+    "cache": true
+  },
+  "openclaw": {
+    "extra_config": {}
+  }
+}

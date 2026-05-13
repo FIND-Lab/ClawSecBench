@@ -1,0 +1,887 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://clawsecbench.org/schema/case.schema.json",
+  "title": "ClawSecBench Case Schema",
+  "description": "Schema for ClawSecBench cases with explicit procedure, benign task, and attack evaluation specifications.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "metadata",
+    "procedure"
+  ],
+  "properties": {
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "procedure": {
+      "$ref": "#/$defs/procedure"
+    },
+    "benign_task": {
+      "$ref": "#/$defs/benignTask"
+    },
+    "attack": {
+      "$ref": "#/$defs/attack"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "metadata": {
+            "properties": {
+              "sample_type": {
+                "const": "attack_pure"
+              }
+            },
+            "required": [
+              "sample_type"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "attack"
+        ],
+        "not": {
+          "required": [
+            "benign_task"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "metadata": {
+            "properties": {
+              "sample_type": {
+                "const": "attack_mixed"
+              }
+            },
+            "required": [
+              "sample_type"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "attack",
+          "benign_task"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "metadata": {
+            "properties": {
+              "sample_type": {
+                "const": "benign"
+              }
+            },
+            "required": [
+              "sample_type"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "benign_task"
+        ],
+        "not": {
+          "required": [
+            "attack"
+          ]
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixtureId": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+      "description": "Stable fixture identifier used by turn placeholders such as {{fixture_id.target}}. Required only when a turn references the environment item through placeholders."
+    },
+    "fixtureTarget": {
+      "type": "string",
+      "pattern": "^\\$(WORKSPACE|OPENCLAW_STATE|HOME|SYSTEM)/.+$",
+      "description": "Virtual benchmark root path. Use $WORKSPACE/... for agent workspace files and case-owned files, $OPENCLAW_STATE/... for OpenClaw runtime-state files such as openclaw.json, $HOME/... for user-home files such as ~/.ssh/config, and $SYSTEM/... for controlled absolute system paths such as /etc/passwd."
+    },
+    "fixtureTimestamp": {
+      "description": "Optional fixture timestamp for age-sensitive cases. Prefer an ISO-8601 UTC string such as 2024-04-01T12:34:56Z. Date-only strings and numeric Unix timestamps are also accepted.",
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "date-time"
+        },
+        {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "number"
+        }
+      ]
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "sample_type",
+        "threat_layer",
+        "attack_category"
+      ],
+      "properties": {
+        "id": {
+          "description": "Unique case identifier. Must be a stable string usable in filenames and runtime artifact paths.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+        },
+        "sample_type": {
+          "description": "Case family used to determine required evaluation blocks.",
+          "type": "string",
+          "enum": [
+            "attack_pure",
+            "attack_mixed",
+            "benign"
+          ]
+        },
+        "threat_layer": {
+          "type": "string",
+          "enum": [
+            "trusted_foundation",
+            "perception_input",
+            "cognitive_state",
+            "decision_alignment",
+            "execution_control"
+          ]
+        },
+        "attack_category": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "description": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "procedure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "session_mode",
+        "turns",
+        "environment"
+      ],
+      "properties": {
+        "session_mode": {
+          "type": "string",
+          "enum": [
+            "single_session",
+            "reset_each_turn"
+          ]
+        },
+        "request_timeout_sec": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional per-case override for a single conversation turn request timeout in seconds. When omitted, the runner uses the configured gateway default."
+        },
+        "turns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/turn"
+          }
+        },
+        "environment": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/environmentItem"
+          }
+        }
+      }
+    },
+    "turn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "content"
+      ],
+      "properties": {
+        "role": {
+          "type": "string",
+          "const": "user"
+        },
+        "content": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "User-visible turn text. May include fixture placeholders like {{fixture_id.target}} or {{fixture_id.url}}."
+        }
+      }
+    },
+    "environmentItem": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/fileEnvironment"
+        },
+        {
+          "$ref": "#/$defs/documentEnvironment"
+        },
+        {
+          "$ref": "#/$defs/webPublicEnvironment"
+        },
+        {
+          "$ref": "#/$defs/webPrivateEnvironment"
+        },
+        {
+          "$ref": "#/$defs/skillReferenceEnvironment"
+        },
+        {
+          "$ref": "#/$defs/skillInlineEnvironment"
+        }
+      ]
+    },
+    "fileEnvironment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "name",
+        "target",
+        "content"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/fixtureId"
+        },
+        "kind": {
+          "type": "string",
+          "const": "file"
+        },
+        "name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "target": {
+          "$ref": "#/$defs/fixtureTarget"
+        },
+        "content": {
+          "type": "string"
+        },
+        "mtime": {
+          "$ref": "#/$defs/fixtureTimestamp"
+        }
+      }
+    },
+    "documentEnvironment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "name",
+        "target",
+        "content"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/fixtureId"
+        },
+        "kind": {
+          "type": "string",
+          "const": "document"
+        },
+        "name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "target": {
+          "$ref": "#/$defs/fixtureTarget"
+        },
+        "content": {
+          "type": "string"
+        },
+        "mtime": {
+          "$ref": "#/$defs/fixtureTimestamp"
+        }
+      }
+    },
+    "webPublicEnvironment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "name",
+        "access",
+        "url"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/fixtureId"
+        },
+        "kind": {
+          "type": "string",
+          "const": "web"
+        },
+        "access": {
+          "type": "string",
+          "const": "public",
+          "description": "Access the real external URL during execution."
+        },
+        "name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "url": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "content_type": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Optional reference snapshot metadata for the public page. The current runtime ignores it for public web fixtures."
+        },
+        "content": {
+          "type": "string",
+          "description": "Optional reference snapshot of the public page. The current runtime ignores it for public web fixtures."
+        }
+      }
+    },
+    "webPrivateEnvironment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "access",
+        "name",
+        "url",
+        "content_type",
+        "content"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/fixtureId"
+        },
+        "kind": {
+          "type": "string",
+          "const": "web"
+        },
+        "access": {
+          "type": "string",
+          "const": "private",
+          "description": "Serve the page from a benchmark-controlled local web fixture instead of the real external URL."
+        },
+        "name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "url": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Logical or original page URL shown in the case definition. The runner rewrites {{fixture_id.url}} to a local fixture URL during execution."
+        },
+        "content_type": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "content": {
+          "type": "string"
+        }
+      }
+    },
+    "skillReferenceEnvironment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "mode",
+        "name",
+        "reference"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/fixtureId"
+        },
+        "kind": {
+          "type": "string",
+          "const": "skill"
+        },
+        "mode": {
+          "type": "string",
+          "const": "reference",
+          "description": "Reference a built-in OpenClaw skill name from the benchmark snapshot allowlist."
+        },
+        "name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "reference": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Built-in skill name listed in metadata/openclaw-skill-snapshots/latest-2026-04-25.json."
+        }
+      }
+    },
+    "skillInlineEnvironment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "mode",
+        "name",
+        "files"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/fixtureId"
+        },
+        "kind": {
+          "type": "string",
+          "const": "skill"
+        },
+        "mode": {
+          "type": "string",
+          "const": "inline",
+          "description": "Embed concrete skill files directly in the case."
+        },
+        "name": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Explicit file fixtures that should be materialized for this inline skill.",
+          "items": {
+            "$ref": "#/$defs/inlineSkillFile"
+          }
+        }
+      }
+    },
+    "inlineSkillFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "content"
+      ],
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/fixtureTarget"
+        },
+        "content": {
+          "type": "string"
+        },
+        "mtime": {
+          "$ref": "#/$defs/fixtureTimestamp"
+        }
+      }
+    },
+    "benignTask": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "goal",
+        "success_mode",
+        "success_judge",
+        "success_policy",
+        "success_checks"
+      ],
+      "properties": {
+        "goal": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "success_mode": {
+          "type": "string",
+          "description": "Authoritative success evaluation path. Use judge by default; use checks only when success_checks should be the official scorer.",
+          "enum": [
+            "judge",
+            "checks"
+          ]
+        },
+        "success_judge": {
+          "$ref": "#/$defs/successJudge"
+        },
+        "success_policy": {
+          "type": "string",
+          "enum": [
+            "all",
+            "any"
+          ]
+        },
+        "success_checks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/check"
+          }
+        }
+      }
+    },
+    "attack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "goal",
+        "success_mode",
+        "success_judge",
+        "success_policy",
+        "success_checks",
+        "refusal_check"
+      ],
+      "properties": {
+        "goal": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "success_mode": {
+          "type": "string",
+          "description": "Authoritative success evaluation path. Use judge by default; use checks only when success_checks should be the official scorer.",
+          "enum": [
+            "judge",
+            "checks"
+          ]
+        },
+        "success_judge": {
+          "$ref": "#/$defs/successJudge"
+        },
+        "success_policy": {
+          "type": "string",
+          "enum": [
+            "any",
+            "all"
+          ]
+        },
+        "success_checks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/check"
+          }
+        },
+        "refusal_check": {
+          "$ref": "#/$defs/attackRefusalCheck"
+        }
+      }
+    },
+    "successJudge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rubric"
+      ],
+      "properties": {
+        "rubric": {
+          "$ref": "#/$defs/nonEmptyString",
+          "description": "Semantic success rubric used by the LLM judge."
+        },
+        "focus_paths": {
+          "type": "array",
+          "description": "Optional relevant paths whose post-run contents should be included in the LLM success evaluation.",
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          },
+          "default": []
+        }
+      }
+    },
+    "check": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/replyContainsCheck"
+        },
+        {
+          "$ref": "#/$defs/replyRegexCheck"
+        },
+        {
+          "$ref": "#/$defs/replyLlmJudgeCheck"
+        },
+        {
+          "$ref": "#/$defs/pathExistsCheck"
+        },
+        {
+          "$ref": "#/$defs/pathModifiedCheck"
+        },
+        {
+          "$ref": "#/$defs/pathContainsCheck"
+        },
+        {
+          "$ref": "#/$defs/jsonValueCheck"
+        },
+        {
+          "$ref": "#/$defs/artifactCreatedCheck"
+        },
+        {
+          "$ref": "#/$defs/commandExecutedCheck"
+        }
+      ]
+    },
+    "attackRefusalCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepted_reasons"
+      ],
+      "properties": {
+        "accepted_reasons": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          },
+          "description": "Reference reasons that count as explicit refusal or mitigation when recognized in the assistant reply."
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "final_reply",
+            "all_replies"
+          ]
+        },
+        "rubric": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "replyContainsCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "value",
+        "scope"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "reply_contains"
+        },
+        "value": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "final_reply",
+            "all_replies"
+          ]
+        }
+      }
+    },
+    "replyRegexCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "pattern",
+        "scope"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "reply_regex"
+        },
+        "pattern": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "final_reply",
+            "all_replies"
+          ]
+        }
+      }
+    },
+    "replyLlmJudgeCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "rubric",
+        "scope"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "reply_llm_judge"
+        },
+        "rubric": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "final_reply",
+            "all_replies"
+          ]
+        }
+      }
+    },
+    "pathExistsCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "path"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "path_exists"
+        },
+        "path": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "pathModifiedCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "path"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "path_modified"
+        },
+        "path": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "pathContainsCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Checks whether a file contains the expected substring. Matching is case-insensitive by default.",
+      "required": [
+        "type",
+        "path",
+        "value"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "path_contains"
+        },
+        "path": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "value": {
+          "type": "string",
+          "description": "Expected file content substring. Matching is case-insensitive by default."
+        }
+      }
+    },
+    "jsonValueCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "path",
+        "json_path",
+        "operator",
+        "value"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "json_value"
+        },
+        "path": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "json_path": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "operator": {
+          "type": "string",
+          "enum": [
+            "contains",
+            "equals"
+          ]
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        }
+      }
+    },
+    "artifactCreatedCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "path"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "artifact_created"
+        },
+        "path": {
+          "$ref": "#/$defs/nonEmptyString"
+        }
+      }
+    },
+    "commandExecutedCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "pattern"
+          ]
+        },
+        {
+          "required": [
+            "command"
+          ]
+        }
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "command_executed"
+        },
+        "pattern": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "command": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "args_contains": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          }
+        }
+      }
+    }
+  }
+}
