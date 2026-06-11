@@ -313,6 +313,16 @@ class LLMJudge:
                 system_dir=Path(str(system_dir)) if system_dir else None,
                 value=raw_path,
             )
+            if target.is_symlink():
+                item = {
+                    "path": logical_path,
+                    "exists": True,
+                    "kind": "symlink",
+                    "link_target": os.readlink(target),
+                }
+                items.append(item)
+                continue
+
             item: dict[str, Any] = {"path": logical_path, "exists": target.exists()}
             if not target.exists():
                 items.append(item)
