@@ -19,6 +19,7 @@ env/
 # AutoBench runtime outputs
 outputs/
 *.log
+run_out/
 
 # Local environment files
 .env
